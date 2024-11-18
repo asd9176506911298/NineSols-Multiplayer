@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <AssemblyName>ExampleMod</AssemblyName>
-        <Description>Example Mod</Description>
+        <AssemblyName>Multiplayer</AssemblyName>
+        <Description>Multiplayer</Description>
         <TargetFramework>netstandard2.1</TargetFramework>
         <Version>1.0.0</Version>
         <LangVersion>latest</LangVersion>
@@ -11,14 +11,14 @@
 
 
         <!-- todo macOS -->
-        <NineSolsPath Condition="'$(OS)' == 'Windows_NT'">C:/Program Files (x86)/Steam/steamapps/common/Nine Sols</NineSolsPath>
+        <NineSolsPath Condition="'$(OS)' == 'Windows_NT'">E:\Games\Nine Sols</NineSolsPath>
         <NineSolsPath Condition="'$(OS)' != 'Windows_NT'">$(HOME)/.local/share/Steam/steamapps/common/Nine Sols</NineSolsPath>
         
         <!-- If you're not using R2Modman/Thunderstore, this can be NineSolsPath as well. Only used in CopyDir -->
-        <ProfileDir Condition="'$(OS)' == 'Windows_NT'">C:/Users/$username/AppData/Roaming/r2modmanPlus-local/NineSols/profiles/Default</ProfileDir>
+        <ProfileDir Condition="'$(OS)' == 'Windows_NT'">C:\Users\a0936\AppData\Roaming\r2modmanPlus-local\NineSols\profiles\Default</ProfileDir>
         <ProfileDir Condition="'$(OS)' != 'Windows_NT'">$(HOME)/.config/r2modmanPlus-local/NineSols/profiles/Default</ProfileDir>
         <!-- After building, copy the dll to this folder. Useful for hot-reloading: https://github.com/BepInEx/BepInEx.Debug/blob/master/README.md#scriptengine -->
-        <!--<CopyDir>$(ProfileDir)/BepInEx/scripts</CopyDir>-->
+        <CopyDir>$(ProfileDir)/BepInEx/scripts</CopyDir>
     </PropertyGroup>
 
     <ItemGroup>
