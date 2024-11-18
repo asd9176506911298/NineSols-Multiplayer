@@ -19,7 +19,6 @@
         <ProfileDir Condition="'$(OS)' != 'Windows_NT'">$(HOME)/.config/r2modmanPlus-local/NineSols/profiles/Default</ProfileDir>
         <!-- After building, copy the dll to this folder. Useful for hot-reloading: https://github.com/BepInEx/BepInEx.Debug/blob/master/README.md#scriptengine -->
         <CopyDir>$(ProfileDir)/BepInEx/scripts</CopyDir>
-      <CopyDir>E:\Games\Nine Sols1030\BepInEx\scripts</CopyDir>
     </PropertyGroup>
 
     <ItemGroup>
@@ -56,9 +55,15 @@
         <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(CopyDir)" SkipUnchangedFiles="true" />
         <Copy SourceFiles="$(TargetDir)$(TargetName).pdb" DestinationFolder="$(CopyDir)" SkipUnchangedFiles="true" />
     </Target>
+  
 
     <Target Name="PackageMod" AfterTargets="Publish">
         <Copy SourceFiles="$(TargetPath)" DestinationFolder="../thunderstore/build/dll" SkipUnchangedFiles="true" />
         <Exec Command="tcli build --config-path ../thunderstore/thunderstore.toml" />
+    </Target>
+  
+
+    <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+      <Exec Command="copy /Y &quot;$(TargetPath)&quot; &quot;E:\Games\Nine Sols1030\BepInEx\scripts&quot;&#xD;&#xA;copy /Y &quot;$(TargetDir)$(TargetName).pdb&quot; &quot;E:\Games\Nine Sols1030\BepInEx\scripts&quot;" />
     </Target>
 </Project>
