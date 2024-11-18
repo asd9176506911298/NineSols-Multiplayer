@@ -1,176 +1,145 @@
 ﻿using BepInEx;
-using BepInEx.Configuration;
 using HarmonyLib;
 using NineSolsAPI;
 using UnityEngine;
 using System.Net;
 using System.Net.Sockets;
-using System.Threading;
 using System.Text;
+using System.Threading;
 using System;
+using BepInEx.Configuration;
 
 namespace Multiplayer {
     [BepInDependency(NineSolsAPICore.PluginGUID)]
     [BepInPlugin(PluginInfo.PLUGIN_GUID, PluginInfo.PLUGIN_NAME, PluginInfo.PLUGIN_VERSION)]
     public class Multiplayer : BaseUnityPlugin {
-        private ConfigEntry<bool> enableServerConfig = null!;
-        private ConfigEntry<int> serverPortConfig = null!;
-        private ConfigEntry<KeyboardShortcut> startServerShortcut = null!;
-        private ConfigEntry<KeyboardShortcut> joinServerShortcut = null!; // Add this shortcut for joining server
-
-        private Harmony harmony = null!;
-
+        private Harmony? harmony;
         private TcpListener? serverListener;
-        private Thread? serverThread;
         private TcpClient? client;
         private NetworkStream? stream;
+        private Thread? serverThread;
         private Thread? clientThread;
 
+        private const int ServerPort = 7777;
+
+        // Config Bindings for Key Shortcuts
+        private ConfigEntry<KeyboardShortcut> startServerShortcut;
+        private ConfigEntry<KeyboardShortcut> joinServerShortcut;
+
         private void Awake() {
-            Log.Init(Logger);
-            RCGLifeCycle.DontDestroyForever(gameObject);
+            harmony = new Harmony(PluginInfo.PLUGIN_GUID);
+            harmony.PatchAll();
+            Logger.LogInfo("Multiplayer plugin loaded.");
 
-            harmony = Harmony.CreateAndPatchAll(typeof(Multiplayer).Assembly);
-
-            enableServerConfig = Config.Bind("Server", "EnableServer", true, "Enable the server to host multiplayer.");
-            serverPortConfig = Config.Bind("Server", "ServerPort", 7777, "Port number for the server to listen on.");
+            // Bind shortcuts from the config file
             startServerShortcut = Config.Bind("Server", "StartServerShortcut",
                 new KeyboardShortcut(KeyCode.H, KeyCode.LeftControl), "Shortcut to start the server");
             joinServerShortcut = Config.Bind("Client", "JoinServerShortcut",
                 new KeyboardShortcut(KeyCode.J, KeyCode.LeftControl), "Shortcut to join the server");
 
+            // Add keybindings using KeybindManager
             KeybindManager.Add(this, StartServer, () => startServerShortcut.Value);
             KeybindManager.Add(this, StartClient, () => joinServerShortcut.Value);
-
-            Logger.LogInfo($"Plugin {PluginInfo.PLUGIN_GUID} is loaded!");
         }
 
-        private void StartServer() {
-            if (enableServerConfig.Value) {
-                if (serverListener == null || !serverListener.Server.IsBound) {
-                    StartHostingServer();
-                    ToastManager.Toast("Server started.");
-                } else {
-                    ToastManager.Toast("Server is already running.");
-                }
-            } else {
-                ToastManager.Toast("Server is disabled in the configuration.");
+        private void Update() {
+            // Listen for key presses based on the configured shortcuts
+            if (startServerShortcut.Value.IsPressed()) {
+                StartServer();
+            }
+            if (joinServerShortcut.Value.IsPressed()) {
+                StartClient();
             }
         }
 
-        private void StartHostingServer() {
-            serverThread = new Thread(() => HostServer(serverPortConfig.Value));
-            serverThread.Start();
+        public void StartServer() {
+            if (serverListener == null) {
+                serverThread = new Thread(() => {
+                    serverListener = new TcpListener(IPAddress.Any, ServerPort);
+                    serverListener.Start();
+                    Logger.LogInfo($"Server started on port {ServerPort}");
+
+                    while (true) {
+                        var client = serverListener.AcceptTcpClient();
+                        Logger.LogInfo($"Client connected: {client.Client.RemoteEndPoint}");
+                        ThreadPool.QueueUserWorkItem(HandleClient, client);
+                    }
+                });
+                serverThread.Start();
+            } else {
+                Logger.LogInfo("Server is already running.");
+            }
         }
 
-        private void HostServer(int port) {
-            try {
-                serverListener = new TcpListener(IPAddress.Any, port);
-                serverListener.Start();
-                Logger.LogInfo($"Server is hosting on port {port}.");
+        public void StartClient() {
+            if (client == null) {
+                try {
+                    client = new TcpClient("127.0.0.1", ServerPort);
+                    stream = client.GetStream();
+                    Logger.LogInfo("Connected to server.");
 
-                while (true) {
-                    TcpClient client = serverListener.AcceptTcpClient();
-                    Logger.LogInfo($"New client connected: {client.Client.RemoteEndPoint}");
-                    ThreadPool.QueueUserWorkItem(HandleClient, client);
+                    string message = "Hello from client!";
+                    byte[] data = Encoding.UTF8.GetBytes(message);
+                    stream.Write(data, 0, data.Length);
+
+                    clientThread = new Thread(() => HandleServerResponse(client));
+                    clientThread.Start();
+                } catch (Exception ex) {
+                    Logger.LogError($"Error connecting to server: {ex.Message}");
                 }
-            } catch (Exception ex) {
-                Logger.LogError($"Error hosting server: {ex.Message}");
+            } else {
+                Logger.LogInfo("Client already connected.");
             }
         }
 
         private void HandleClient(object obj) {
-            TcpClient client = (TcpClient)obj;
-            NetworkStream stream = client.GetStream();
+            var client = (TcpClient)obj;
+            var stream = client.GetStream();
+
+            try {
+                byte[] buffer = new byte[1024];
+                while (true) {
+                    int bytesRead = stream.Read(buffer, 0, buffer.Length);
+                    if (bytesRead == 0) break;
+
+                    string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                    Logger.LogInfo($"Received from client: {message}");
+
+                    byte[] response = Encoding.UTF8.GetBytes($"Server response: {message}");
+                    stream.Write(response, 0, response.Length);
+                }
+            } catch {
+                Logger.LogWarning("Client disconnected.");
+            } finally {
+                client.Close();
+            }
+        }
+
+        private void HandleServerResponse(TcpClient client) {
+            var stream = client.GetStream();
             byte[] buffer = new byte[1024];
 
             try {
                 while (true) {
-                    if (stream.DataAvailable) {
-                        int bytesRead = stream.Read(buffer, 0, buffer.Length);
-                        if (bytesRead > 0) {
-                            string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                            Logger.LogInfo($"Received message from client: {message}");
-
-                            // Send a response back to the client
-                            string responseMessage = "Hello from the server!";
-                            byte[] response = Encoding.UTF8.GetBytes(responseMessage);
-                            stream.Write(response, 0, response.Length);
-
-                            Logger.LogInfo($"Sent response to client: {responseMessage}");
-                        }
+                    int bytesRead = stream.Read(buffer, 0, buffer.Length);
+                    if (bytesRead > 0) {
+                        string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                        Logger.LogInfo($"Received from server: {message}");
                     }
-                    Thread.Sleep(50);
                 }
-            } catch (Exception ex) {
-                Logger.LogError($"Error handling client: {ex.Message}");
+            } catch {
+                Logger.LogWarning("Disconnected from server.");
             } finally {
                 client.Close();
-                Logger.LogInfo("Client disconnected.");
             }
         }
-
-
-        private void StartClient() {
-            try {
-                if (client != null && client.Connected) {
-                    Logger.LogInfo("Already connected to the server.");
-                    return;
-                }
-
-                client = new TcpClient("127.0.0.1", serverPortConfig.Value); // Replace with actual server IP
-                stream = client.GetStream();
-                Logger.LogInfo("Client connected to the server.");
-
-                // Send a message to the server after connecting
-                string message = "Hello, I'm a client!";
-                byte[] messageBytes = Encoding.UTF8.GetBytes(message);
-                stream.Write(messageBytes, 0, messageBytes.Length);
-                Logger.LogInfo($"Sent message to server: {message}");
-
-                clientThread = new Thread(() => HandleServerCommunication(client));
-                clientThread.Start();
-            } catch (Exception ex) {
-                Logger.LogError($"Error connecting to server: {ex.Message}");
-            }
-        }
-
-
-        private void HandleServerCommunication(TcpClient client) {
-            try {
-                byte[] buffer = new byte[1024];
-
-                while (client.Connected) {
-                    if (stream!.DataAvailable) {
-                        int bytesRead = stream.Read(buffer, 0, buffer.Length);
-                        if (bytesRead > 0) {
-                            string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                            Logger.LogInfo($"Received message from server: {message}");
-
-                            // Handle the response message here (e.g., display it in the game UI)
-                            if (message.Contains("Hello from the server!")) {
-                                Logger.LogInfo("Server responded with a greeting.");
-                            }
-                        }
-                    }
-
-                    Thread.Sleep(50); // Prevent tight looping
-                }
-            } catch (Exception ex) {
-                Logger.LogError($"Error in communication with server: {ex.Message}");
-            } finally {
-                client.Close();
-                Logger.LogInfo("Client disconnected from the server.");
-            }
-        }
-
 
         private void OnDestroy() {
             serverListener?.Stop();
             serverThread?.Abort();
             client?.Close();
             clientThread?.Abort();
-            harmony.UnpatchSelf();
+            harmony?.UnpatchSelf();
         }
     }
 }
