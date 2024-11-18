@@ -78,60 +78,39 @@ namespace Multiplayer {
             try {
                 byte[] buffer = new byte[1024];
 
-                // Log when client is connecting
-                Log.Info($"Client {client.Client.RemoteEndPoint} connected.");
-
-                // Check if the client already has an object; if not, instantiate one
+                // Instantiate a new object for this client
                 if (!clientObjects.ContainsKey(client)) {
                     GameObject newObject = InstantiatePlayerObject();
-                    if (newObject == null) {
-                        Log.Error("Failed to instantiate player object.");
-                        return;
-                    }
                     clientObjects[client] = newObject;
-                    Log.Info($"Instantiated new object for client: {newObject.name}");
                 }
 
                 while (!stopServer) {
                     int bytesRead = stream.Read(buffer, 0, buffer.Length);
-                    if (bytesRead == 0) break; // Client disconnected
+                    if (bytesRead == 0) break;
 
-                    if (bytesRead == 12) // Assuming Vector3 is sent as 12 bytes (3 floats)
-                    {
-                        try {
-                            // Deserialize the position data
-                            float x = BitConverter.ToSingle(buffer, 0);
-                            float y = BitConverter.ToSingle(buffer, sizeof(float));
-                            float z = BitConverter.ToSingle(buffer, 2 * sizeof(float));
-                            Vector3 receivedVector = new Vector3(x, y, z);
+                    if (bytesRead == 12) { // Handle Vector3 (position)
+                        float x = BitConverter.ToSingle(buffer, 0);
+                        float y = BitConverter.ToSingle(buffer, sizeof(float));
+                        float z = BitConverter.ToSingle(buffer, 2 * sizeof(float));
+                        Vector3 receivedVector = new(x, y, z);
 
-                            // Log received position for debugging
-                            Log.Info($"Received position: {receivedVector}");
-
-                            // Ensure client object exists before updating position
-                            if (clientObjects.TryGetValue(client, out var clientObject)) {
-                                if (clientObject != null) {
-                                    receivedVector.y += 6.5f; // Adjust for offset
-                                    clientObject.transform.position = receivedVector;
-                                    Log.Info($"Updated position of {clientObject.name} to: {receivedVector}");
-                                } else {
-                                    Log.Warning("Client object is null, cannot update position.");
-                                }
-                            } else {
-                                Log.Warning("Client object not found in clientObjects dictionary.");
-                            }
-
-                            // Optionally, broadcast updated position to other clients
-                            BroadcastPosition(client, receivedVector);
-                        } catch (Exception ex) {
-                            Log.Error($"Error while processing position update: {ex.Message}");
+                        if (clientObjects.TryGetValue(client, out var clientObject)) {
+                            receivedVector.y += 6.5f;
+                            clientObject.transform.position = receivedVector;
+                            Log.Info($"Updated {clientObject.name} position to: {receivedVector}");
                         }
+                    } else { // Handle messages
+                        string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                        Log.Info($"Received message from client: {message}");
                     }
+
+                    byte[] response = Encoding.UTF8.GetBytes("Message received");
+                    stream.Write(response, 0, response.Length);
+                    Log.Info("Sent response to client: Message received");
                 }
             } catch (Exception ex) {
                 Log.Warning($"Client disconnected or error occurred: {ex.Message}");
             } finally {
-                // Clean up client objects
                 if (clientObjects.TryGetValue(client, out var obj)) {
                     Destroy(obj);
                     clientObjects.Remove(client);
@@ -139,28 +118,6 @@ namespace Multiplayer {
                 client.Close();
             }
         }
-
-
-
-        private void BroadcastPosition(TcpClient sender, Vector3 position) {
-            byte[] positionData = new byte[12];
-            Buffer.BlockCopy(BitConverter.GetBytes(position.x), 0, positionData, 0, sizeof(float));
-            Buffer.BlockCopy(BitConverter.GetBytes(position.y), 0, positionData, sizeof(float), sizeof(float));
-            Buffer.BlockCopy(BitConverter.GetBytes(position.z), 0, positionData, 2 * sizeof(float), sizeof(float));
-
-            foreach (var kvp in clientObjects) {
-                if (kvp.Key != sender) { // Don't send to the sender
-                    try {
-                        var stream = kvp.Key.GetStream();
-                        stream.Write(positionData, 0, positionData.Length);
-                        stream.Flush();
-                    } catch {
-                        Log.Warning("Failed to broadcast to a client.");
-                    }
-                }
-            }
-        }
-
 
         private GameObject InstantiatePlayerObject() {
             var rotateProxy = Player.i.transform.Find("RotateProxy");
@@ -207,15 +164,7 @@ namespace Multiplayer {
                 while (!stopClient) {
                     if (stream.DataAvailable) {
                         int bytesRead = stream.Read(buffer, 0, buffer.Length);
-                        if (bytesRead == 12) { // Handle Vector3 (position update)
-                            float x = BitConverter.ToSingle(buffer, 0);
-                            float y = BitConverter.ToSingle(buffer, sizeof(float));
-                            float z = BitConverter.ToSingle(buffer, 2 * sizeof(float));
-                            Vector3 receivedVector = new(x, y, z);
-
-                            // Update the corresponding object
-                            UpdateClientObject(receivedVector);
-                        } else if (bytesRead > 0) {
+                        if (bytesRead > 0) {
                             string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
                             Log.Info($"Received from server: {message}");
                         }
@@ -228,46 +177,30 @@ namespace Multiplayer {
             }
         }
 
-        private void UpdateClientObject(Vector3 position) {
-            if (instantiatedObject != null) {
-                instantiatedObject.transform.position = position;
-                Log.Info($"Updated local object position to: {position}");
-            } else {
-                Log.Warning("No object instantiated to update.");
-            }
-        }
-
         public void UpdatePlayerPostion() {
             if (client != null && client.Connected && stream != null) {
                 try {
-                    // Capture the player's current position
-                    Vector3 playerPosition = Player.i.transform.position;
+                    Vector3 valueToSend = Player.i.transform.position; // Example Vector3 value to send
+                    byte[] data = new byte[3 * sizeof(float)]; // Each float is 4 bytes, so for 3 floats, it's 12 bytes
 
-                    // Prepare the position data for transmission
-                    byte[] data = new byte[3 * sizeof(float)];
-                    Buffer.BlockCopy(BitConverter.GetBytes(playerPosition.x), 0, data, 0, sizeof(float));
-                    Buffer.BlockCopy(BitConverter.GetBytes(playerPosition.y), 0, data, sizeof(float), sizeof(float));
-                    Buffer.BlockCopy(BitConverter.GetBytes(playerPosition.z), 0, data, 2 * sizeof(float), sizeof(float));
+                    // Copy the components of Vector3 into the byte array
+                    Buffer.BlockCopy(BitConverter.GetBytes(valueToSend.x), 0, data, 0, sizeof(float));
+                    Buffer.BlockCopy(BitConverter.GetBytes(valueToSend.y), 0, data, sizeof(float), sizeof(float));
+                    Buffer.BlockCopy(BitConverter.GetBytes(valueToSend.z), 0, data, 2 * sizeof(float), sizeof(float));
 
-                    // Send the position data to the server
                     stream.Write(data, 0, data.Length);
-                    stream.Flush(); // Ensure the data is sent immediately
-
-                    Log.Info($"Position sent: {playerPosition}");
+                    Log.Info($"Sent Vector3: {valueToSend}");
                 } catch (Exception ex) {
-                    Log.Error($"Error updating player position: {ex.Message}");
+                    Log.Error($"Error sending Vector3: {ex.Message}");
                 }
             } else {
-                // Handle cases where the client is not connected
                 if (client == null || !client.Connected) {
-                    Log.Warning("Client not connected. Attempting to reconnect...");
-                    StartClient(); // Attempt to reconnect
-                } else if (stream == null) {
-                    Log.Warning("Stream is null. Check connection state.");
+                    Log.Warning("Client not connected.");
+                } else {
+                    Log.Warning("Stream is null.");
                 }
             }
         }
-
 
         private void OnDestroy() {
             stopServer = true;
