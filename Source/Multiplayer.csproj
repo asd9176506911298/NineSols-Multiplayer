@@ -64,6 +64,6 @@
   
 
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-      <Exec Command="copy /Y &quot;$(TargetPath)&quot; &quot;E:\Games\Nine Sols1030\BepInEx\scripts&quot;&#xD;&#xA;copy /Y &quot;$(TargetDir)$(TargetName).pdb&quot; &quot;E:\Games\Nine Sols1030\BepInEx\scripts&quot;" />
+      <Exec Command="copy /Y &quot;$(TargetPath)&quot; &quot;E:\Games\Nine Sols1030\BepInEx\scripts&quot;&#xD;&#xA;copy /Y &quot;$(TargetDir)$(TargetName).pdb&quot; &quot;E:\Games\Nine Sols1030\BepInEx\scripts&quot;&#xD;&#xA;copy /Y &quot;$(TargetPath)&quot; &quot;D:\Games\Nine Sols\BepInEx\scripts&quot;&#xD;&#xA;copy /Y &quot;$(TargetDir)$(TargetName).pdb&quot; &quot;D:\Games\Nine Sols\BepInEx\scripts&quot;" />
     </Target>
 </Project>
