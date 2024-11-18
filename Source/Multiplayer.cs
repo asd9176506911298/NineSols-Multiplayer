@@ -92,12 +92,8 @@ namespace Multiplayer {
                             string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
                             Logger.LogInfo($"Received message from client: {message}");
 
-                            // Send a response back to the client
-                            string responseMessage = "Hello from the server!";
-                            byte[] response = Encoding.UTF8.GetBytes(responseMessage);
+                            byte[] response = Encoding.UTF8.GetBytes("Message received");
                             stream.Write(response, 0, response.Length);
-
-                            Logger.LogInfo($"Sent response to client: {responseMessage}");
                         }
                     }
                     Thread.Sleep(50);
@@ -110,7 +106,6 @@ namespace Multiplayer {
             }
         }
 
-
         private void StartClient() {
             try {
                 if (client != null && client.Connected) {
@@ -118,15 +113,9 @@ namespace Multiplayer {
                     return;
                 }
 
-                client = new TcpClient("127.0.0.1", serverPortConfig.Value); // Replace with actual server IP
+                client = new TcpClient("127.0.0.1", serverPortConfig.Value); // Replace with the actual server IP
                 stream = client.GetStream();
                 Logger.LogInfo("Client connected to the server.");
-
-                // Send a message to the server after connecting
-                string message = "Hello, I'm a client!";
-                byte[] messageBytes = Encoding.UTF8.GetBytes(message);
-                stream.Write(messageBytes, 0, messageBytes.Length);
-                Logger.LogInfo($"Sent message to server: {message}");
 
                 clientThread = new Thread(() => HandleServerCommunication(client));
                 clientThread.Start();
@@ -134,7 +123,6 @@ namespace Multiplayer {
                 Logger.LogError($"Error connecting to server: {ex.Message}");
             }
         }
-
 
         private void HandleServerCommunication(TcpClient client) {
             try {
@@ -146,11 +134,6 @@ namespace Multiplayer {
                         if (bytesRead > 0) {
                             string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
                             Logger.LogInfo($"Received message from server: {message}");
-
-                            // Handle the response message here (e.g., display it in the game UI)
-                            if (message.Contains("Hello from the server!")) {
-                                Logger.LogInfo("Server responded with a greeting.");
-                            }
                         }
                     }
 
@@ -163,7 +146,6 @@ namespace Multiplayer {
                 Logger.LogInfo("Client disconnected from the server.");
             }
         }
-
 
         private void OnDestroy() {
             serverListener?.Stop();
