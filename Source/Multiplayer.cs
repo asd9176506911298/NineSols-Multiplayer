@@ -20,9 +20,13 @@ public class Multiplayer : BaseUnityPlugin {
     private Harmony harmony = null!;
     private NetManager? netManager;
     private NetDataWriter dataWriter = new();
+    GameObject tmpPlayer;
 
     private EventBasedNetListener? listener;
     private NetPeer? serverPeer;
+
+    private Dictionary<int, GameObject> activePlayers = new();  // Keeps track of all connected players by their IDs
+
 
     private void Awake() {
         Log.Init(Logger);
@@ -54,7 +58,11 @@ public class Multiplayer : BaseUnityPlugin {
             netManager.Start(9050);
             Log.Info("Server started on port 9050.");
 
-            // Handle connection requests (e.g., accept up to 10 clients)
+            // Add the host player (itself) to the activePlayers list
+            int hostPlayerId = 0;  // Assign an ID for the host player
+            activePlayers[hostPlayerId] = new GameObject("HostPlayer");  // Create host player object
+            Log.Info("Host player created and added to active players.");
+
             listener.ConnectionRequestEvent += request => {
                 if (netManager.ConnectedPeersCount < 10) // Max players
                     request.AcceptIfKey("game_key");
@@ -62,24 +70,28 @@ public class Multiplayer : BaseUnityPlugin {
                     request.Reject();
             };
 
+            listener.PeerConnectedEvent += peer => {
+                int playerId = peer.Id;  // Assign a unique ID to each player
+                activePlayers[playerId] = new GameObject($"Player_{playerId}");  // Create new player object
+                Log.Info($"New player connected with ID {playerId}");
+
+                // Send all existing players' data (including host) to the new client
+                foreach (var player in activePlayers) {
+                    SendPlayerDataToClient(peer, player.Key);
+                }
+            };
+
             listener.PeerDisconnectedEvent += (peer, disconnectInfo) => {
-                ToastManager.Toast($"{peer} {disconnectInfo}");
-                peer?.Disconnect();
+                int playerId = peer.Id;
+                if (activePlayers.ContainsKey(playerId)) {
+                    Destroy(activePlayers[playerId]);  // Cleanup the player object
+                    activePlayers.Remove(playerId);
+                    Log.Info($"Player {playerId} disconnected.");
+                }
             };
 
             listener.NetworkReceiveEvent += (fromPeer, dataReader, deliveryMethod, channel) => {
-                ToastManager.Toast($"{fromPeer} {dataReader.GetFloat()}");
-            };
-
-            // Handle incoming messages from clients
-            listener.PeerConnectedEvent += peer => {
-                ToastManager.Toast($"Kirito Connected {peer}");
-                dataWriter.Reset();
-                dataWriter.Put("Welcome Kirito Enter Server");
-                peer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
-                dataWriter.Reset();
-                dataWriter.Put(1.2f);
-                peer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
+                // Handle data from clients (e.g., player actions, updates, etc.)
             };
         } else {
             // Start client and connect to server (example: localhost)
@@ -88,16 +100,38 @@ public class Multiplayer : BaseUnityPlugin {
         }
     }
 
+
+    private void SendPlayerDataToClient(NetPeer clientPeer, int playerId) {
+        if (activePlayers.ContainsKey(playerId)) {
+            NetDataWriter dataWriter = new();
+            GameObject player = activePlayers[playerId];
+            dataWriter.Reset();
+            dataWriter.Put(0.1f);  // Send player position
+            clientPeer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
+        }
+    }
+
     void ConnectToServer() {
         listener.NetworkReceiveEvent += (fromPeer, dataReader, deliveryMethod, channel) =>
         {
-            //ToastManager.Toast($"Receive From Server:{dataReader.GetString()}");
-            ToastManager.Toast($"Receive From Server:{dataReader.GetFloat()}");
+            int playerId = fromPeer.Id;  // Player ID is sent along with the data
+            //Vector3 playerPosition = dataReader.GetVector3();  // Receiving player position
+            Vector3 playerPosition = Vector3.zeroVector;
+
+            // Instantiate or update the player object
+            if (!activePlayers.ContainsKey(playerId)) {
+                GameObject newPlayer = new GameObject($"Player_{playerId}");
+                newPlayer.transform.position = playerPosition;
+                activePlayers[playerId] = newPlayer;
+            } else {
+                activePlayers[playerId].transform.position = playerPosition;  // Update position if already exists
+            }
         };
+
         netManager.Start();
         netManager.Connect("localhost", 9050, "game_key");
-
     }
+
 
     void TestMethod() {
         dataWriter.Reset();
@@ -109,7 +143,6 @@ public class Multiplayer : BaseUnityPlugin {
         if (netManager?.IsRunning == true) {
             var peer = netManager.FirstPeer;
             peer?.Disconnect();
-            Log.Info("Disconnected from server.");
             ToastManager.Toast("Disconnected from server.");
         }
     }
