@@ -22,6 +22,7 @@ public class Multiplayer : BaseUnityPlugin {
     private NetDataWriter dataWriter = new();
     GameObject tmpPlayer;
 
+    private int localPlayerid;
 
     private EventBasedNetListener? listener;
     private NetPeer? serverPeer;
@@ -44,7 +45,7 @@ public class Multiplayer : BaseUnityPlugin {
 
         KeybindManager.Add(this, InitializeNetworking, () => somethingKeyboardShortcut.Value);
         KeybindManager.Add(this, DisconnectFromServer, () => new KeyboardShortcut(KeyCode.D, KeyCode.LeftControl));
-        KeybindManager.Add(this, TestMethod, () => new KeyboardShortcut(KeyCode.X, KeyCode.LeftControl));
+        KeybindManager.Add(this, ConnectToServer, () => new KeyboardShortcut(KeyCode.X, KeyCode.LeftControl));
 
         Log.Info($"Plugin {PluginInfo.PLUGIN_GUID} is loaded!");
     }
@@ -59,11 +60,6 @@ public class Multiplayer : BaseUnityPlugin {
             netManager.Start(9050);
             Log.Info("Server started on port 9050.");
 
-            // Add the host player (itself) to the activePlayers list
-            int hostPlayerId = 0;  // Assign an ID for the host player
-            activePlayers[hostPlayerId] = new GameObject("HostPlayer");  // Create host player object
-            activePlayers[hostPlayerId].transform.position = Vector3.zero;  // Set position to (0, 0, 0) or desired starting position
-            Log.Info("Host player created and added to active players.");
             foreach (var x in activePlayers) {
                 ToastManager.Toast(x);
             }
@@ -76,11 +72,14 @@ public class Multiplayer : BaseUnityPlugin {
 
             listener.PeerConnectedEvent += peer => {
                 int playerId = peer.Id;
-                var SpriteHolder = Instantiate(Player.i.transform.Find("RotateProxy").Find("SpriteHolder").gameObject);
-                SpriteHolder.name = $"Player_{playerId}";
-                activePlayers[playerId] = SpriteHolder;
+                ToastManager.Toast(peer.Id);
+                activePlayers[playerId] = new GameObject($"Player_{playerId}");
                 activePlayers[playerId].transform.position = Vector3.zero;
                 Log.Info($"New player connected with ID {playerId}");
+
+                dataWriter.Reset();
+                dataWriter.Put(playerId);
+                peer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
 
                 // Send all active players to the new client
                 foreach (var player in activePlayers) {
@@ -125,18 +124,18 @@ public class Multiplayer : BaseUnityPlugin {
                 // Check if it's the host player (ID 0) and skip instantiation for the client
                 if (!activePlayers.ContainsKey(playerId)) {
                     // Only instantiate new players for non-host players
-                    var SpriteHolder = Instantiate(Player.i.transform.Find("RotateProxy").Find("SpriteHolder").gameObject);
-                    SpriteHolder.name = $"Player_{playerId}";
-                    SpriteHolder.transform.position = new Vector3(x, y, z);  // Set the player's position
-                    activePlayers[playerId] = SpriteHolder;  // Add to active players
+
+                    GameObject player = new GameObject($"Player_{playerId}");
+                    player.transform.position = new Vector3(x, y, z);  // Set the player's position
+                    activePlayers[playerId] = player;  // Add to active players
                     Log.Info($"New player with ID {playerId} instantiated on client.");
-                    
+
                 } else {
                     // If the player already exists, just update their position
                     activePlayers[playerId].transform.position = new Vector3(x, y, z);
                 }
 
-                Log.Info($"Player {playerId} position updated: ({x}, {y}, {z})");
+                //Log.Info($"Player {playerId} position updated: ({x}, {y}, {z})");
             };
 
         } else {
@@ -164,32 +163,25 @@ public class Multiplayer : BaseUnityPlugin {
     void ConnectToServer() {
         listener.NetworkReceiveEvent += (fromPeer, dataReader, deliveryMethod, channel) => {
             if (dataReader.AvailableBytes == sizeof(int)) {
-                // Assume this is a disconnection message if only an ID is sent
-                int disconnectedPlayerId = dataReader.GetInt();
-                if (activePlayers.ContainsKey(disconnectedPlayerId)) {
-                    Destroy(activePlayers[disconnectedPlayerId]); // Destroy the player's object
-                    activePlayers.Remove(disconnectedPlayerId);
-                    Log.Info($"Player {disconnectedPlayerId} disconnected and removed from client.");
-                }
-                return;
-            }
-
-            // Handle position updates or other messages as usual
-            int playerId = dataReader.GetInt();
-            float x = dataReader.GetFloat();
-            float y = dataReader.GetFloat();
-            float z = dataReader.GetFloat();
-
-            if (!activePlayers.ContainsKey(playerId)) {
-                var SpriteHolder = Instantiate(Player.i.transform.Find("RotateProxy").Find("SpriteHolder").gameObject);
-                SpriteHolder.name = $"Player_{playerId}";
-                SpriteHolder.transform.position = new Vector3(x, y, z);
-                activePlayers[playerId] = SpriteHolder;
+                // Assume this is the player ID message from the server
+                localPlayerid = dataReader.GetInt();
+                Log.Info($"Assigned localPlayerid: {localPlayerid}");
             } else {
-                activePlayers[playerId].transform.position = new Vector3(x, y, z);
+                // Handle other data (e.g., position updates)
+                int playerId = dataReader.GetInt();
+                float x = dataReader.GetFloat();
+                float y = dataReader.GetFloat();
+                float z = dataReader.GetFloat();
+
+                if (!activePlayers.ContainsKey(playerId)) {
+                    GameObject newPlayer = new GameObject($"Player_{playerId}");
+                    newPlayer.transform.position = new Vector3(x, y, z);
+                    activePlayers[playerId] = newPlayer;
+                } else {
+                    activePlayers[playerId].transform.position = new Vector3(x, y, z);
+                }
             }
         };
-
 
 
         netManager.Start();
@@ -204,6 +196,15 @@ public class Multiplayer : BaseUnityPlugin {
             Log.Info($"Client disconnected. All player objects destroyed.");
         };
     }
+
+    private void SendPlayerDataToServer(int playerId) {
+        // Assuming the server expects a message to register player information
+        dataWriter.Reset();
+        dataWriter.Put(playerId);
+        netManager.FirstPeer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
+    }
+
+
 
     // Method to destroy all player objects
     private void DestroyAllPlayers() {
@@ -230,21 +231,39 @@ public class Multiplayer : BaseUnityPlugin {
     }
 
     private void Update() {
+        if (!isServer.Value) {
             foreach (var playerEntry in activePlayers) {
-                if(Player.i != null) {
+                if (Player.i != null) {
                     int playerId = playerEntry.Key;
-                    GameObject player = playerEntry.Value;
-                    dataWriter.Reset();
-                    dataWriter.Put(playerId);  // Include player ID
-                    dataWriter.Put(Player.i.transform.position.x);  // Include position
-                    dataWriter.Put(Player.i.transform.position.y);
-                    dataWriter.Put(Player.i.transform.position.z);
+                    if(playerId == localPlayerid) {
+                        dataWriter.Reset();
+                        dataWriter.Put(localPlayerid);  // Include player ID
+                        dataWriter.Put(Player.i.transform.position.x);  // Include position
+                        dataWriter.Put(Player.i.transform.position.y);
+                        dataWriter.Put(Player.i.transform.position.z);
 
-                    foreach (var peer in netManager.ConnectedPeerList) {
-                        peer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
-                    }
+                        foreach (var peer in netManager.ConnectedPeerList) {
+                            peer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
+                        }
+                    }   
                 }
             }
+        } else {
+            foreach (var playerEntry in activePlayers) {
+
+                int playerId = playerEntry.Key;
+                var player = playerEntry.Value;
+                dataWriter.Reset();
+                dataWriter.Put(playerId);  // Include player ID
+                dataWriter.Put(player.transform.position.x);  // Include position
+                dataWriter.Put(player.transform.position.y);
+                dataWriter.Put(player.transform.position.z);
+
+                foreach (var peer in netManager.ConnectedPeerList) {
+                    peer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
+                }
+            }
+        }
         netManager?.PollEvents();
     }
 
