@@ -60,11 +60,11 @@ public class Multiplayer : BaseUnityPlugin {
             Log.Info("Server started on port 9050.");
 
             // Add the host player (itself) to the activePlayers list
-            //int hostPlayerId = 0;  // Assign an ID for the host player
-            //activePlayers[hostPlayerId] = new GameObject("HostPlayer");  // Create host player object
-            //activePlayers[hostPlayerId].transform.position = Vector3.zero;  // Set position to (0, 0, 0) or desired starting position
-            //Log.Info("Host player created and added to active players.");
-            foreach(var x in activePlayers) {
+            int hostPlayerId = 0;  // Assign an ID for the host player
+            activePlayers[hostPlayerId] = new GameObject("HostPlayer");  // Create host player object
+            activePlayers[hostPlayerId].transform.position = Vector3.zero;  // Set position to (0, 0, 0) or desired starting position
+            Log.Info("Host player created and added to active players.");
+            foreach (var x in activePlayers) {
                 ToastManager.Toast(x);
             }
             listener.ConnectionRequestEvent += request => {
@@ -229,17 +229,18 @@ public class Multiplayer : BaseUnityPlugin {
     private void Update() {
         if (isServer.Value) {
             foreach (var playerEntry in activePlayers) {
-                int playerId = playerEntry.Key;
-                GameObject player = playerEntry.Value;
+                if(Player.i != null) {
+                    int playerId = playerEntry.Key;
+                    GameObject player = playerEntry.Value;
+                    dataWriter.Reset();
+                    dataWriter.Put(playerId);  // Include player ID
+                    dataWriter.Put(Player.i.transform.position.x);  // Include position
+                    dataWriter.Put(Player.i.transform.position.y);
+                    dataWriter.Put(Player.i.transform.position.z);
 
-                dataWriter.Reset();
-                dataWriter.Put(playerId);  // Include player ID
-                dataWriter.Put(player.transform.position.x);  // Include position
-                dataWriter.Put(player.transform.position.y);
-                dataWriter.Put(player.transform.position.z);
-
-                foreach (var peer in netManager.ConnectedPeerList) {
-                    peer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
+                    foreach (var peer in netManager.ConnectedPeerList) {
+                        peer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
+                    }
                 }
             }
         }
