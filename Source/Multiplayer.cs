@@ -95,11 +95,22 @@ public class Multiplayer : BaseUnityPlugin {
             listener.PeerDisconnectedEvent += (peer, disconnectInfo) => {
                 int playerId = peer.Id;
                 if (activePlayers.ContainsKey(playerId)) {
-                    Destroy(activePlayers[playerId]);  // Cleanup the player object
+                    // Destroy the player's object on the server
+                    Destroy(activePlayers[playerId]);
                     activePlayers.Remove(playerId);
                     Log.Info($"Player {playerId} disconnected.");
+
+                    // Notify all other clients about the disconnection
+                    dataWriter.Reset();
+                    dataWriter.Put(playerId); // Send the ID of the disconnected player
+                    foreach (var connectedPeer in netManager.ConnectedPeerList) {
+                        if (connectedPeer != peer) { // Don't send to the disconnected peer
+                            connectedPeer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
+                        }
+                    }
                 }
             };
+
 
             listener.NetworkReceiveEvent += (fromPeer, dataReader, deliveryMethod, channel) => {
                 // Read the player ID and position data
@@ -149,23 +160,32 @@ public class Multiplayer : BaseUnityPlugin {
 
     void ConnectToServer() {
         listener.NetworkReceiveEvent += (fromPeer, dataReader, deliveryMethod, channel) => {
-            int playerId = dataReader.GetInt();  // Read player ID
-            float x = dataReader.GetFloat();     // Read x position
-            float y = dataReader.GetFloat();     // Read y position
-            float z = dataReader.GetFloat();     // Read z position
-            Vector3 playerPosition = new Vector3(x, y, z);
+            if (dataReader.AvailableBytes == sizeof(int)) {
+                // Assume this is a disconnection message if only an ID is sent
+                int disconnectedPlayerId = dataReader.GetInt();
+                if (activePlayers.ContainsKey(disconnectedPlayerId)) {
+                    Destroy(activePlayers[disconnectedPlayerId]); // Destroy the player's object
+                    activePlayers.Remove(disconnectedPlayerId);
+                    Log.Info($"Player {disconnectedPlayerId} disconnected and removed from client.");
+                }
+                return;
+            }
 
-            // Instantiate or update the player object
+            // Handle position updates or other messages as usual
+            int playerId = dataReader.GetInt();
+            float x = dataReader.GetFloat();
+            float y = dataReader.GetFloat();
+            float z = dataReader.GetFloat();
+
             if (!activePlayers.ContainsKey(playerId)) {
                 GameObject newPlayer = new GameObject($"Player_{playerId}");
-                newPlayer.transform.position = playerPosition;
+                newPlayer.transform.position = new Vector3(x, y, z);
                 activePlayers[playerId] = newPlayer;
-                Log.Info($"Player {playerId} instantiated at {playerPosition}.");
             } else {
-                activePlayers[playerId].transform.position = playerPosition;  // Update position if already exists
-                Log.Info($"Player {playerId} position updated to {playerPosition}.");
+                activePlayers[playerId].transform.position = new Vector3(x, y, z);
             }
         };
+
 
 
         netManager.Start();
