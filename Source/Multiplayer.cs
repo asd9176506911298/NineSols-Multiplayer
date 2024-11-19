@@ -74,14 +74,21 @@ public class Multiplayer : BaseUnityPlugin {
             };
 
             listener.PeerConnectedEvent += peer => {
-                int playerId = peer.Id;  // Assign a unique ID to each player
-                activePlayers[playerId] = new GameObject($"Player_{playerId}");  // Create new player object
-                activePlayers[playerId].transform.position = Vector3.zero;  // Default position for new player
+                int playerId = peer.Id;
+                activePlayers[playerId] = new GameObject($"Player_{playerId}");
+                activePlayers[playerId].transform.position = Vector3.zero;
                 Log.Info($"New player connected with ID {playerId}");
 
-                // Send all existing players' data (including host) to the new client
+                // Send all active players to the new client
                 foreach (var player in activePlayers) {
                     SendPlayerDataToClient(peer, player.Key);
+                }
+
+                // Notify all other players of the new player
+                foreach (var otherPeer in netManager.ConnectedPeerList) {
+                    if (otherPeer != peer) {
+                        SendPlayerDataToClient(otherPeer, playerId);
+                    }
                 }
             };
 
@@ -129,9 +136,9 @@ public class Multiplayer : BaseUnityPlugin {
 
     private void SendPlayerDataToClient(NetPeer clientPeer, int playerId) {
         if (activePlayers.ContainsKey(playerId)) {
-            NetDataWriter dataWriter = new();
             GameObject player = activePlayers[playerId];
             dataWriter.Reset();
+            dataWriter.Put(playerId);  // Send player ID
             dataWriter.Put(player.transform.position.x);  // Send player position
             dataWriter.Put(player.transform.position.y);  // Send player position
             dataWriter.Put(player.transform.position.z);  // Send player position
@@ -139,13 +146,13 @@ public class Multiplayer : BaseUnityPlugin {
         }
     }
 
+
     void ConnectToServer() {
-        listener.NetworkReceiveEvent += (fromPeer, dataReader, deliveryMethod, channel) =>
-        {
-            int playerId = fromPeer.Id;  // Player ID is sent along with the data 
-            float x = dataReader.GetFloat();
-            float y = dataReader.GetFloat();
-            float z = dataReader.GetFloat();
+        listener.NetworkReceiveEvent += (fromPeer, dataReader, deliveryMethod, channel) => {
+            int playerId = dataReader.GetInt();  // Read player ID
+            float x = dataReader.GetFloat();     // Read x position
+            float y = dataReader.GetFloat();     // Read y position
+            float z = dataReader.GetFloat();     // Read z position
             Vector3 playerPosition = new Vector3(x, y, z);
 
             // Instantiate or update the player object
@@ -153,10 +160,13 @@ public class Multiplayer : BaseUnityPlugin {
                 GameObject newPlayer = new GameObject($"Player_{playerId}");
                 newPlayer.transform.position = playerPosition;
                 activePlayers[playerId] = newPlayer;
+                Log.Info($"Player {playerId} instantiated at {playerPosition}.");
             } else {
                 activePlayers[playerId].transform.position = playerPosition;  // Update position if already exists
+                Log.Info($"Player {playerId} position updated to {playerPosition}.");
             }
         };
+
 
         netManager.Start();
         netManager.Connect("localhost", 9050, "game_key");
@@ -197,28 +207,24 @@ public class Multiplayer : BaseUnityPlugin {
 
     private void Update() {
         if (isServer.Value) {
-            foreach (var pplayer in activePlayers) {
-                var player = pplayer.Value;
+            foreach (var playerEntry in activePlayers) {
+                int playerId = playerEntry.Key;
+                GameObject player = playerEntry.Value;
+
                 dataWriter.Reset();
-                dataWriter.Put(player.transform.position.x);  // Send x
-                dataWriter.Put(player.transform.position.y);  // Send y
-                dataWriter.Put(player.transform.position.z);  // Send z
+                dataWriter.Put(playerId);  // Include player ID
+                dataWriter.Put(player.transform.position.x);  // Include position
+                dataWriter.Put(player.transform.position.y);
+                dataWriter.Put(player.transform.position.z);
+
                 foreach (var peer in netManager.ConnectedPeerList) {
                     peer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
                 }
             }
         }
-
-        //if (netManager?.FirstPeer != null && Player.i != null) {
-        //    dataWriter.Reset();
-        //    dataWriter.Put(Player.i.transform.position.x);  // Send x
-        //    dataWriter.Put(Player.i.transform.position.y);  // Send y
-        //    dataWriter.Put(Player.i.transform.position.z);  // Send z
-        //    netManager.FirstPeer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
-        //}
-
         netManager?.PollEvents();
     }
+
 
     private void OnDestroy() {
         harmony.UnpatchSelf();
