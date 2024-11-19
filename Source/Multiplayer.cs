@@ -22,6 +22,7 @@ public class Multiplayer : BaseUnityPlugin {
     private NetDataWriter dataWriter = new();
     GameObject tmpPlayer;
 
+
     private EventBasedNetListener? listener;
     private NetPeer? serverPeer;
 
