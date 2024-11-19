@@ -172,7 +172,7 @@ public class Multiplayer : BaseUnityPlugin {
                 float z = dataReader.GetFloat();
 
                 ToastManager.Toast($"{fromPeer.Id} {localPlayerid} {playerId}");
-                if (!activePlayers.ContainsKey(playerId)) {
+                if (!activePlayers.ContainsKey(localPlayerid)) {
                     // Instantiate a new SpriteHolder for other players
                     GameObject SpriteHolder;
                     if (playerId == localPlayerid)
@@ -181,10 +181,10 @@ public class Multiplayer : BaseUnityPlugin {
                         SpriteHolder = new GameObject($"Player_{playerId}");
                     SpriteHolder.name = $"Player_{playerId}";
                     SpriteHolder.transform.position = new Vector3(x, y, z);
-                    activePlayers[playerId] = SpriteHolder;
+                    activePlayers[localPlayerid] = SpriteHolder;
                     
                 } else
-                    activePlayers[playerId].transform.position = new Vector3(x, y, z);
+                    activePlayers[localPlayerid].transform.position = new Vector3(x, y, z);
             }
         };
 
