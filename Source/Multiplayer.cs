@@ -161,7 +161,7 @@ public class Multiplayer : BaseUnityPlugin {
     void ConnectToServer() {
         listener.NetworkReceiveEvent += (fromPeer, dataReader, deliveryMethod, channel) => {
             if (dataReader.AvailableBytes == sizeof(int)) {
-                // Assume this is the player ID message from the server
+                // Handle player ID assignment from server
                 localPlayerid = dataReader.GetInt();
                 Log.Info($"Assigned localPlayerid: {localPlayerid}");
             } else {
@@ -171,14 +171,18 @@ public class Multiplayer : BaseUnityPlugin {
                 float y = dataReader.GetFloat();
                 float z = dataReader.GetFloat();
 
-                if (!activePlayers.ContainsKey(playerId)) {
-                    var SpriteHolder = Instantiate(Player.i.transform.Find("RotateProxy").Find("SpriteHolder").gameObject);
-                    SpriteHolder.name = $"Player_{playerId}";
-                    SpriteHolder.transform.position = new Vector3(x, y, z);
-                    activePlayers[playerId] = SpriteHolder;
-                } else {
+                ToastManager.Toast($"{playerId} {localPlayerid}");
+                // Only instantiate and update positions for other players
+                if (playerId == localPlayerid) {
+                    if (!activePlayers.ContainsKey(playerId)) {
+                        // Instantiate a new SpriteHolder for other players
+                        var SpriteHolder = Instantiate(Player.i.transform.Find("RotateProxy").Find("SpriteHolder").gameObject);
+                        SpriteHolder.name = $"Player_{playerId}";
+                        SpriteHolder.transform.position = new Vector3(x, y, z);
+                        activePlayers[playerId] = SpriteHolder;
+                    } 
+                }else
                     activePlayers[playerId].transform.position = new Vector3(x, y, z);
-                }
             }
         };
 
