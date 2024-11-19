@@ -171,17 +171,19 @@ public class Multiplayer : BaseUnityPlugin {
                 float y = dataReader.GetFloat();
                 float z = dataReader.GetFloat();
 
-                ToastManager.Toast($"{playerId} {localPlayerid}");
-                // Only instantiate and update positions for other players
-                if (playerId == localPlayerid) {
-                    if (!activePlayers.ContainsKey(playerId)) {
-                        // Instantiate a new SpriteHolder for other players
-                        var SpriteHolder = Instantiate(Player.i.transform.Find("RotateProxy").Find("SpriteHolder").gameObject);
-                        SpriteHolder.name = $"Player_{playerId}";
-                        SpriteHolder.transform.position = new Vector3(x, y, z);
-                        activePlayers[playerId] = SpriteHolder;
-                    } 
-                }else
+                ToastManager.Toast($"{fromPeer.Id} {localPlayerid} {playerId}");
+                if (!activePlayers.ContainsKey(playerId)) {
+                    // Instantiate a new SpriteHolder for other players
+                    GameObject SpriteHolder;
+                    if (playerId == localPlayerid)
+                        SpriteHolder = Instantiate(Player.i.transform.Find("RotateProxy").Find("SpriteHolder").gameObject);
+                    else
+                        SpriteHolder = new GameObject($"Player_{playerId}");
+                    SpriteHolder.name = $"Player_{playerId}";
+                    SpriteHolder.transform.position = new Vector3(x, y, z);
+                    activePlayers[playerId] = SpriteHolder;
+                    
+                } else
                     activePlayers[playerId].transform.position = new Vector3(x, y, z);
             }
         };
@@ -257,7 +259,7 @@ public class Multiplayer : BaseUnityPlugin {
                 int playerId = playerEntry.Key;
                 var player = playerEntry.Value;
                 dataWriter.Reset();
-                dataWriter.Put(playerId);  // Include player ID
+                dataWriter.Put(localPlayerid);  // Include player ID
                 dataWriter.Put(player.transform.position.x);  // Include position
                 dataWriter.Put(player.transform.position.y+6.5f);
                 dataWriter.Put(player.transform.position.z);
