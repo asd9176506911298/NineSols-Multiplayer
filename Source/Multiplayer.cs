@@ -25,16 +25,19 @@ public class Multiplayer : BaseUnityPlugin {
     private EventBasedNetListener? listener;
     private NetPeer? serverPeer;
 
+    [SerializeField]
+    private GameObject PlayerPrefab = null!; // Assign in Unity Editor or load dynamically
+
+    private GameObject? instantiatedObject;
+
     private void Awake() {
         Log.Init(Logger);
         RCGLifeCycle.DontDestroyForever(gameObject);
 
         harmony = Harmony.CreateAndPatchAll(typeof(Multiplayer).Assembly);
 
-        // Config for enabling server/client mode
         isServer = Config.Bind("Network", "IsServer", true, "Set to true to run as server, false for client");
 
-        // Other configurations
         somethingKeyboardShortcut = Config.Bind("General.Something", "Shortcut",
             new KeyboardShortcut(KeyCode.H, KeyCode.LeftControl), "Shortcut to execute");
 
@@ -44,81 +47,78 @@ public class Multiplayer : BaseUnityPlugin {
         Log.Info($"Plugin {PluginInfo.PLUGIN_GUID} is loaded!");
     }
 
-    // Method to update player position on the server
     private void UpdatePlayerPosition(NetPeer peer, Vector3 position) {
-        // Check if the player exists in the serverPlayers dictionary
-        ToastManager.Toast(position);
-        if (peer != null) {
-            if (serverPlayers.ContainsKey(peer)) {
-                // Update the player's position
-                serverPlayers[peer].Position = position;
-            } else {
-                // If the player doesn't exist, create a new PlayerData object
-                serverPlayers.Add(peer, new PlayerData(position));
-            }
+        if (!serverPlayers.ContainsKey(peer)) {
+            // Create a new player object
+            GameObject newPlayerObject = Instantiate(PlayerPrefab); // Make sure this is assigned
+            serverPlayers[peer] = new PlayerData(position, newPlayerObject);
+        }
+
+        serverPlayers[peer].Position = position;
+        BroadcastPlayerPosition(peer, position);
+    }
+
+    private void OnConnectedToServer() {
+        ToastManager.Toast("OnConnectedToServer");
+        if(instantiatedObject == null) {
+            GameObject spriteHolder = Player.i.transform.Find("RotateProxy").Find("SpriteHolder").gameObject;
+            instantiatedObject = Instantiate(spriteHolder);
+        }   
+    }
+
+    private void UpdatePlayerPositionOnClient(Vector3 newPosition) {
+        if (instantiatedObject != null) {
+            instantiatedObject.transform.position = newPosition;
         }
     }
 
     private void InitializeNetworking() {
         listener = new EventBasedNetListener();
         netManager = new NetManager(listener) { AutoRecycle = true };
-        ToastManager.Toast(isServer.Value);
 
         if (isServer.Value) {
-            // Start server on port 9050
+            ToastManager.Toast("StartServer");
             netManager.Start(9050);
-            Log.Info("Server started on port 9050.");
-
-            // Handle connection requests (e.g., accept up to 10 clients)
             listener.ConnectionRequestEvent += request => {
-                if (netManager.ConnectedPeersCount < 10) // Max players
+                if (netManager.ConnectedPeersCount < 10)
                     request.AcceptIfKey("game_key");
                 else
                     request.Reject();
             };
 
-            // Handle incoming messages from clients
             listener.NetworkReceiveEvent += (peer, reader, channelNumber, deliveryMethod) => {
-                // Read the position from the incoming packet
                 float x = reader.GetFloat();
                 float y = reader.GetFloat();
                 float z = reader.GetFloat();
                 Vector3 newPosition = new Vector3(x, y, z);
-
-                // Update the player position on the server
+                ToastManager.Toast(newPosition);
                 UpdatePlayerPosition(peer, newPosition);
-
-                // Optionally broadcast the updated position to all clients (if necessary)
-                // BroadcastPlayerPosition(peer, newPosition);
             };
         } else {
-            // Start client and connect to server (example: localhost)
+            ToastManager.Toast("Coeenct");
             ConnectToServer();
         }
     }
 
-    private void ConnectToServer() {
-        // Client setup
-        listener.NetworkReceiveEvent += (peer, reader, channelNumber, deliveryMethod) => {
-            string message = reader.GetString();
-            HandleClientMessage(message);
-        };
-
-        listener.ConnectionRequestEvent += request => {
-            // Automatically accept connection requests if we are the client
-            request.AcceptIfKey("game_key");
-        };
-
-        netManager.Start();  // Start the netManager (no port needed for client)
-        Log.Info("Attempting to connect to server at 127.0.0.1:9050...");
-
-        // Example of connecting to localhost at port 9050
-        serverPeer = netManager.Connect(new IPEndPoint(IPAddress.Parse("127.0.0.1"), 9050), "game_key");
+    private void HandleClientMessage(string message) {
+        ToastManager.Toast($"Message from server: {message}");
     }
 
-    private void UpdatePlayerPositionOnClient(Vector3 newPosition) {
-        // Update the player position on the client (Player.i.transform.position)
-        Player.i.transform.position = newPosition;
+
+    private void ConnectToServer() {
+        listener.NetworkReceiveEvent += (peer, reader, channelNumber, deliveryMethod) => {
+            //string message = reader.GetString();
+            //HandleClientMessage(message);
+            float x = reader.GetFloat();
+            float y = reader.GetFloat();
+            float z = reader.GetFloat();
+            Vector3 newPosition = new Vector3(x, y, z);
+            ToastManager.Toast(newPosition);
+        };
+
+        netManager.Start();
+        serverPeer = netManager.Connect(new IPEndPoint(IPAddress.Parse("127.0.0.1"), 9050), "game_key");
+        OnConnectedToServer();
     }
 
     private void BroadcastPlayerPosition(NetPeer excludePeer, Vector3 position) {
@@ -136,71 +136,25 @@ public class Multiplayer : BaseUnityPlugin {
         }
     }
 
-    private void BroadcastToClients(string message, NetPeer excludePeer = null) {
-        if (netManager == null) return;
-
-        dataWriter.Reset();
-        dataWriter.Put(message);
-
-        foreach (var peer in netManager.ConnectedPeerList) {
-            if (peer != excludePeer) {
-                peer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
-            }
-        }
-    }
-
-    private void HandleClientMessage(string message) {
-        // Process messages received on the client
-        ToastManager.Toast($"Message from server: {message}");
-    }
-
     private void SendPlayerPositionToServer(Vector3 position) {
         if (netManager != null && netManager.FirstPeer != null) {
-            // Create a new data writer and reset it
             dataWriter.Reset();
-            dataWriter.Put(position.x); // Send X position
-            dataWriter.Put(position.y); // Send Y position
-            dataWriter.Put(position.z); // Send Z position
-
-            // Send the position to the server
+            dataWriter.Put(position.x);
+            dataWriter.Put(position.y);
+            dataWriter.Put(position.z);
             netManager.FirstPeer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
         }
-    }
-
-    // Send a single float to test
-    private void SendTestDataToServer() {
-        if (netManager != null && netManager.FirstPeer != null) {
-            dataWriter.Reset();
-            dataWriter.Put(53.58f); // Send a single float
-            netManager.FirstPeer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
-        }
-    }
-
-    private void OnTestDataReceived(NetPeer peer, NetDataReader reader, DeliveryMethod deliveryMethod) {
-        float receivedValue = reader.GetFloat(); // Read the single float value
-        ToastManager.Toast($"Received float: {receivedValue}");
     }
 
     private void TestMethod() {
-        // Example: Broadcast a message
         if (netManager != null) {
-            SendPlayerPositionToServer(Player.i.transform.position) ;
+            ToastManager.Toast("123");
+            SendPlayerPositionToServer(new Vector3(1f,2f,3f));
         }
     }
 
     private void Update() {
         netManager?.PollEvents();
-    }
-
-    private void OnNetworkReceive(NetPeer peer, NetDataReader reader, DeliveryMethod deliveryMethod) {
-        // Handle incoming data from clients
-        string message = reader.GetString();
-        Log.Info($"Received: {message}");
-    }
-
-    private void OnConnectionRequest(ConnectionRequest request) {
-        // Accept a connection request
-        request.AcceptIfKey("game_key");
     }
 
     private void OnDestroy() {
@@ -211,9 +165,11 @@ public class Multiplayer : BaseUnityPlugin {
 
     public class PlayerData {
         public Vector3 Position { get; set; }
+        public GameObject PlayerObject { get; set; }
 
-        public PlayerData(Vector3 position) {
+        public PlayerData(Vector3 position, GameObject playerObject) {
             Position = position;
+            PlayerObject = playerObject;
         }
     }
 }
