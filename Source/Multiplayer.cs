@@ -76,7 +76,9 @@ public class Multiplayer : BaseUnityPlugin {
 
             listener.PeerConnectedEvent += peer => {
                 int playerId = peer.Id;
-                activePlayers[playerId] = new GameObject($"Player_{playerId}");
+                var SpriteHolder = Instantiate(Player.i.transform.Find("RotateProxy").Find("SpriteHolder").gameObject);
+                SpriteHolder.name = $"Player_{playerId}";
+                activePlayers[playerId] = SpriteHolder;
                 activePlayers[playerId].transform.position = Vector3.zero;
                 Log.Info($"New player connected with ID {playerId}");
 
@@ -123,10 +125,10 @@ public class Multiplayer : BaseUnityPlugin {
                 // Check if it's the host player (ID 0) and skip instantiation for the client
                 if (!activePlayers.ContainsKey(playerId)) {
                     // Only instantiate new players for non-host players
-                    
-                    GameObject player = new GameObject($"Player_{playerId}");
-                    player.transform.position = new Vector3(x, y, z);  // Set the player's position
-                    activePlayers[playerId] = player;  // Add to active players
+                    var SpriteHolder = Instantiate(Player.i.transform.Find("RotateProxy").Find("SpriteHolder").gameObject);
+                    SpriteHolder.name = $"Player_{playerId}";
+                    SpriteHolder.transform.position = new Vector3(x, y, z);  // Set the player's position
+                    activePlayers[playerId] = SpriteHolder;  // Add to active players
                     Log.Info($"New player with ID {playerId} instantiated on client.");
                     
                 } else {
@@ -179,9 +181,10 @@ public class Multiplayer : BaseUnityPlugin {
             float z = dataReader.GetFloat();
 
             if (!activePlayers.ContainsKey(playerId)) {
-                GameObject newPlayer = new GameObject($"Player_{playerId}");
-                newPlayer.transform.position = new Vector3(x, y, z);
-                activePlayers[playerId] = newPlayer;
+                var SpriteHolder = Instantiate(Player.i.transform.Find("RotateProxy").Find("SpriteHolder").gameObject);
+                SpriteHolder.name = $"Player_{playerId}";
+                SpriteHolder.transform.position = new Vector3(x, y, z);
+                activePlayers[playerId] = SpriteHolder;
             } else {
                 activePlayers[playerId].transform.position = new Vector3(x, y, z);
             }
@@ -227,7 +230,6 @@ public class Multiplayer : BaseUnityPlugin {
     }
 
     private void Update() {
-        if (isServer.Value) {
             foreach (var playerEntry in activePlayers) {
                 if(Player.i != null) {
                     int playerId = playerEntry.Key;
@@ -243,7 +245,6 @@ public class Multiplayer : BaseUnityPlugin {
                     }
                 }
             }
-        }
         netManager?.PollEvents();
     }
 
