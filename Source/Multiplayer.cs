@@ -97,9 +97,7 @@ public class Multiplayer : BaseUnityPlugin {
 
             listener.PeerDisconnectedEvent += (peer, disconnectInfo) => {
                 int playerId = peer.Id;
-                foreach(var xx in activePlayers) {
-                    ToastManager.Toast($"{xx.Key} {xx.Value}"); 
-                }
+
                 if (activePlayers.ContainsKey(playerId)) {
                     Destroy(activePlayers[playerId]); // Destroy the player's GameObject
                     activePlayers.Remove(playerId); // Remove from the dictionary
@@ -108,17 +106,14 @@ public class Multiplayer : BaseUnityPlugin {
 
                     // Notify all remaining connected peers about the disconnection
                     dataWriter.Reset();
-                    dataWriter.Put(playerId); // Notify about the removed player ID
+                    dataWriter.Put(-1); // Use -1 as a signal for disconnect notification
+                    dataWriter.Put(playerId); // Include the player ID to be removed
                     foreach (var connectedPeer in netManager.ConnectedPeerList) {
-                        if (connectedPeer != peer) { // Don't send to the disconnected peer
-                            connectedPeer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
-                        }
+                        connectedPeer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
                     }
                 }
-                foreach (var xx in activePlayers) {
-                    ToastManager.Toast($"{xx.Key} {xx.Value}");
-                }
             };
+
 
 
 
@@ -180,7 +175,6 @@ public class Multiplayer : BaseUnityPlugin {
                 float y = dataReader.GetFloat();
                 float z = dataReader.GetFloat();
 
-                Log.Info($"{localPlayerid} {playerId}");
                 if (!activePlayers.ContainsKey(localPlayerid) && playerId != localPlayerid) {
                     // Instantiate a new SpriteHolder for other players
                     GameObject SpriteHolder;
@@ -189,12 +183,12 @@ public class Multiplayer : BaseUnityPlugin {
                     SpriteHolder.name = $"Player_{playerId}";
                     SpriteHolder.transform.position = new Vector3(x, y, z);
                     activePlayers[localPlayerid] = SpriteHolder;
-                    
-                } else
-                    if (playerId != localPlayerid)
-                        activePlayers[localPlayerid].transform.position = new Vector3(x, y, z);
+                } else if (playerId != localPlayerid) {
+                    activePlayers[localPlayerid].transform.position = new Vector3(x, y, z);
+                }
             }
         };
+
 
 
         netManager.Start();
