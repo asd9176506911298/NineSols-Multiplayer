@@ -268,9 +268,9 @@ public class Multiplayer : BaseUnityPlugin {
                     if (playerId == localPlayerid) {
                         dataWriter.Reset();
                         dataWriter.Put(localPlayerid);  // Include player ID
-                        dataWriter.Put(Player.i.transform.position.x);  // Include position
-                        dataWriter.Put(Player.i.transform.position.y);
-                        dataWriter.Put(Player.i.transform.position.z);
+                        dataWriter.Put(1f);  // Include position
+                        dataWriter.Put(2f);
+                        dataWriter.Put(3f);
                         dataWriter.Put(localAnimationState);
 
                         foreach (var peer in netManager.ConnectedPeerList) {
