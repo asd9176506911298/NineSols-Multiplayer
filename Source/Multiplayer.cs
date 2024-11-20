@@ -125,29 +125,33 @@ public class Multiplayer : BaseUnityPlugin {
 
 
             listener.NetworkReceiveEvent += (fromPeer, dataReader, deliveryMethod, channel) => {
-                // Read the player ID and position data
-                int playerId = dataReader.GetInt();
-                float x = dataReader.GetFloat();
-                float y = dataReader.GetFloat();
-                float z = dataReader.GetFloat();
-                string state = dataReader.GetString();
-                Log.Info($"server: {state}");
+                try {
+                    if (dataReader.AvailableBytes < sizeof(int)) {
+                        Log.Error("Malformed packet received.");
+                        return;
+                    }
 
-                // Check if it's the host player (ID 0) and skip instantiation for the client
-                if (!activePlayers.ContainsKey(playerId)) {
-                    var SpriteHolder = new GameObject($"Player_{playerId}");
-                    SpriteHolder.transform.position = new Vector3(x, y, z);  // Set the player's position
-                    var playerData = new PlayerData(SpriteHolder, state);
-                    activePlayers[playerId] = playerData;
-                    Log.Info($"New player with ID {playerId} instantiated on client.");
+                    int playerId = dataReader.GetInt();
+                    float x = dataReader.GetFloat();
+                    float y = dataReader.GetFloat();
+                    float z = dataReader.GetFloat();
+                    string state = dataReader.GetString();
 
-                } else {
-                    // If the player already exists, just update their position
-                    activePlayers[playerId].PlayerObject.transform.position = new Vector3(x, y, z);
-                    activePlayers[playerId].PlayerObject.GetComponent<Animator>().Play(state, 0, 0f);
+                    Log.Debug($"Received data for player {playerId}: ({x}, {y}, {z}), state: {state}");
+
+                    if (!activePlayers.ContainsKey(playerId)) {
+                        var newPlayer = new GameObject($"Player_{playerId}");
+                        newPlayer.transform.position = new Vector3(x, y, z);
+                        activePlayers[playerId] = new PlayerData(newPlayer, state);
+                        Log.Info($"Created new player {playerId}.");
+                    } else {
+                        var player = activePlayers[playerId];
+                        player.PlayerObject.transform.position = new Vector3(x, y, z);
+                        player.AnimationState = state;
+                    }
+                } catch (Exception ex) {
+                    Log.Error($"Error in NetworkReceiveEvent: {ex.Message}\n{ex.StackTrace}");
                 }
-
-                //Log.Info($"Player {playerId} position updated: ({x}, {y}, {z})");
             };
 
 
@@ -190,7 +194,7 @@ public class Multiplayer : BaseUnityPlugin {
                 float y = dataReader.GetFloat();
                 float z = dataReader.GetFloat();
                 string state = dataReader.GetString();
-
+                Log.Info($"playerId:{playerId} state:{state}");
                 if (!activePlayers.ContainsKey(localPlayerid) && playerId != localPlayerid) {
                     // Instantiate a new SpriteHolder for other players
                     GameObject SpriteHolder;
@@ -202,7 +206,7 @@ public class Multiplayer : BaseUnityPlugin {
                     activePlayers[localPlayerid] = playerData;
                 } else if (playerId != localPlayerid) {
                     activePlayers[localPlayerid].PlayerObject.transform.position = new Vector3(x, y, z);
-                    activePlayers[localPlayerid].PlayerObject.GetComponent<Animator>().Play(activePlayers[localPlayerid].AnimationState, 0, 0f);
+                    activePlayers[localPlayerid].PlayerObject.GetComponent<Animator>()?.Play(state, 0, 0f);
                 }
             }
         };
