@@ -130,6 +130,7 @@ public class Multiplayer : BaseUnityPlugin {
                 float x = dataReader.GetFloat();
                 float y = dataReader.GetFloat();
                 float z = dataReader.GetFloat();
+                string state = dataReader.GetString();
 
                 // Check if it's the host player (ID 0) and skip instantiation for the client
                 if (!activePlayers.ContainsKey(playerId)) {
@@ -142,6 +143,7 @@ public class Multiplayer : BaseUnityPlugin {
                 } else {
                     // If the player already exists, just update their position
                     activePlayers[playerId].PlayerObject.transform.position = new Vector3(x, y, z);
+                    activePlayers[playerId].PlayerObject.GetComponent<Animator>().Play(state, 0, 0f);
                 }
 
                 //Log.Info($"Player {playerId} position updated: ({x}, {y}, {z})");
@@ -165,6 +167,7 @@ public class Multiplayer : BaseUnityPlugin {
             dataWriter.Put(player.transform.position.x);  // Send player position
             dataWriter.Put(player.transform.position.y);  // Send player position
             dataWriter.Put(player.transform.position.z);  // Send player position
+            dataWriter.Put(activePlayers[playerId].AnimationState);  // Send player position
             clientPeer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
         }
     }
@@ -185,7 +188,8 @@ public class Multiplayer : BaseUnityPlugin {
                 float x = dataReader.GetFloat();
                 float y = dataReader.GetFloat();
                 float z = dataReader.GetFloat();
-                string attack = dataReader.GetString();
+                string state = dataReader.GetString();
+                
 
                 if (!activePlayers.ContainsKey(localPlayerid) && playerId != localPlayerid) {
                     // Instantiate a new SpriteHolder for other players
@@ -194,11 +198,11 @@ public class Multiplayer : BaseUnityPlugin {
                     SpriteHolder = Instantiate(Player.i.transform.Find("RotateProxy").Find("SpriteHolder").gameObject);
                     SpriteHolder.name = $"Player_{playerId}";
                     SpriteHolder.transform.position = new Vector3(x, y, z);
-                    var playerData = new PlayerData(SpriteHolder, "Idle");
+                    var playerData = new PlayerData(SpriteHolder, state);
                     activePlayers[localPlayerid] = playerData;
                 } else if (playerId != localPlayerid) {
                     activePlayers[localPlayerid].PlayerObject.transform.position = new Vector3(x, y, z);
-                    activePlayers[localPlayerid].PlayerObject.GetComponent<Animator>().Play(attack, 0, 0f);
+                    activePlayers[localPlayerid].PlayerObject.GetComponent<Animator>().Play(state, 0, 0f);
                 }
             }
         };
@@ -287,7 +291,7 @@ public class Multiplayer : BaseUnityPlugin {
                 dataWriter.Put(player.transform.position.x);  // Include position
                 dataWriter.Put(player.transform.position.y+6.5f);
                 dataWriter.Put(player.transform.position.z);
-                dataWriter.Put("Attack1");
+                dataWriter.Put(playerEntry.Value.AnimationState);
 
                 foreach (var peer in netManager.ConnectedPeerList) {
                     peer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
