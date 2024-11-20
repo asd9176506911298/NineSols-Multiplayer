@@ -30,7 +30,7 @@ public class Multiplayer : BaseUnityPlugin {
     private NetPeer? serverPeer;
 
     private bool isConnected;
-    public string localAnimationState;
+    public string localAnimationState = "";
 
 
     private Dictionary<int, PlayerData> activePlayers = new();  // Keeps track of all connected players by their IDs
@@ -131,12 +131,13 @@ public class Multiplayer : BaseUnityPlugin {
                 float y = dataReader.GetFloat();
                 float z = dataReader.GetFloat();
                 string state = dataReader.GetString();
+                Log.Info($"server: {state}");
 
                 // Check if it's the host player (ID 0) and skip instantiation for the client
                 if (!activePlayers.ContainsKey(playerId)) {
                     var SpriteHolder = new GameObject($"Player_{playerId}");
                     SpriteHolder.transform.position = new Vector3(x, y, z);  // Set the player's position
-                    var playerData = new PlayerData(SpriteHolder, "Idle");
+                    var playerData = new PlayerData(SpriteHolder, state);
                     activePlayers[playerId] = playerData;
                     Log.Info($"New player with ID {playerId} instantiated on client.");
 
@@ -189,7 +190,6 @@ public class Multiplayer : BaseUnityPlugin {
                 float y = dataReader.GetFloat();
                 float z = dataReader.GetFloat();
                 string state = dataReader.GetString();
-                
 
                 if (!activePlayers.ContainsKey(localPlayerid) && playerId != localPlayerid) {
                     // Instantiate a new SpriteHolder for other players
@@ -202,7 +202,7 @@ public class Multiplayer : BaseUnityPlugin {
                     activePlayers[localPlayerid] = playerData;
                 } else if (playerId != localPlayerid) {
                     activePlayers[localPlayerid].PlayerObject.transform.position = new Vector3(x, y, z);
-                    activePlayers[localPlayerid].PlayerObject.GetComponent<Animator>().Play(state, 0, 0f);
+                    activePlayers[localPlayerid].PlayerObject.GetComponent<Animator>().Play(activePlayers[localPlayerid].AnimationState, 0, 0f);
                 }
             }
         };
@@ -275,6 +275,7 @@ public class Multiplayer : BaseUnityPlugin {
                         dataWriter.Put(Player.i.transform.position.y);
                         dataWriter.Put(Player.i.transform.position.z);
                         dataWriter.Put(localAnimationState);
+                        Log.Info(localAnimationState);
 
                         foreach (var peer in netManager.ConnectedPeerList) {
                             peer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
@@ -292,6 +293,7 @@ public class Multiplayer : BaseUnityPlugin {
                 dataWriter.Put(player.transform.position.y+6.5f);
                 dataWriter.Put(player.transform.position.z);
                 dataWriter.Put(playerEntry.Value.AnimationState);
+                //Log.Info(playerEntry.Value.AnimationState);
 
                 foreach (var peer in netManager.ConnectedPeerList) {
                     peer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
