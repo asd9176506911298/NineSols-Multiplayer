@@ -79,9 +79,9 @@ public class Multiplayer : BaseUnityPlugin {
 
             listener.PeerConnectedEvent += peer => {
                 int playerId = peer.Id;
-                var SpriteHolder = new GameObject($"Player_{playerId}");
-                activePlayers[playerId].PlayerObject = SpriteHolder;
-                activePlayers[playerId].PlayerObject.transform.position = Vector3.zero;
+                var playerObject = new GameObject($"Player_{playerId}");
+                activePlayers[playerId] = new PlayerData(playerObject, "Idle");
+                playerObject.transform.position = Vector3.zero; // Default position for new players
                 ToastManager.Toast($"New player connected with ID {playerId}");
 
                 dataWriter.Reset();
@@ -133,10 +133,10 @@ public class Multiplayer : BaseUnityPlugin {
 
                 // Check if it's the host player (ID 0) and skip instantiation for the client
                 if (!activePlayers.ContainsKey(playerId)) {
-                    var SpriteHolder = new GameObject($"Player_{playerId}");
-                    SpriteHolder.transform.position = new Vector3(x, y, z);  // Set the player's position
-                    activePlayers[playerId].PlayerObject= SpriteHolder;  // Add to active players
-                    Log.Info($"New player with ID {playerId} instantiated on client.");
+                    var playerObject = new GameObject($"Player_{playerId}");
+                    playerObject.transform.position = new Vector3(x, y, z); // Set position
+                    activePlayers[playerId] = new PlayerData(playerObject, animationState); // Add new player
+                    ToastManager.Toast($"New player connected with ID {playerId}");
 
                 } else {
                     // If the player already exists, just update their position
@@ -165,6 +165,7 @@ public class Multiplayer : BaseUnityPlugin {
             dataWriter.Put(player.transform.position.x);  // Send player position
             dataWriter.Put(player.transform.position.y);  // Send player position
             dataWriter.Put(player.transform.position.z);  // Send player position
+            dataWriter.Put(activePlayers[playerId].AnimationState);  // Send player position
             clientPeer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
         }
     }
@@ -188,10 +189,11 @@ public class Multiplayer : BaseUnityPlugin {
                 string attack = dataReader.GetString();
 
                 if (!activePlayers.ContainsKey(localPlayerid) && playerId != localPlayerid) {
+                    Log.Info($"Create {localPlayerid} {playerId} {localPlayerid}");
                     // Instantiate a new SpriteHolder for other players
                     GameObject SpriteHolder;
-                    Log.Info($"playerId != localPlayerid:{playerId != localPlayerid}");
-                    SpriteHolder = Instantiate(Player.i.transform.Find("RotateProxy").Find("SpriteHolder").gameObject);
+                    //SpriteHolder = Instantiate(Player.i.transform.Find("RotateProxy").Find("SpriteHolder").gameObject);
+                    SpriteHolder = new GameObject();
                     SpriteHolder.name = $"Player_{playerId}";
                     SpriteHolder.transform.position = new Vector3(x, y, z);
                     activePlayers[localPlayerid].PlayerObject = SpriteHolder;
@@ -266,9 +268,9 @@ public class Multiplayer : BaseUnityPlugin {
                     if (playerId == localPlayerid) {
                         dataWriter.Reset();
                         dataWriter.Put(localPlayerid);  // Include player ID
-                        dataWriter.Put(Player.i.transform.position.x);  // Include position
-                        dataWriter.Put(Player.i.transform.position.y);
-                        dataWriter.Put(Player.i.transform.position.z);
+                        dataWriter.Put(1f);  // Include position
+                        dataWriter.Put(1f);
+                        dataWriter.Put(1f);
                         dataWriter.Put(localAnimationState);
 
                         foreach (var peer in netManager.ConnectedPeerList) {
