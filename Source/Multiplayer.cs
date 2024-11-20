@@ -15,6 +15,7 @@ namespace Multiplayer;
 [BepInDependency(NineSolsAPICore.PluginGUID)]
 [BepInPlugin(PluginInfo.PLUGIN_GUID, PluginInfo.PLUGIN_NAME, PluginInfo.PLUGIN_VERSION)]
 public class Multiplayer : BaseUnityPlugin {
+    public static Multiplayer Instance { get; private set; }
     private ConfigEntry<bool> isServer = null!;
     private ConfigEntry<KeyboardShortcut> somethingKeyboardShortcut = null!;
 
@@ -29,8 +30,10 @@ public class Multiplayer : BaseUnityPlugin {
     private NetPeer? serverPeer;
 
     private bool isConnected;
+    public string localAnimationState;
 
-    private Dictionary<int, GameObject> activePlayers = new();  // Keeps track of all connected players by their IDs
+    private Dictionary<int, PlayerData> activePlayers = new();
+
 
 
     private void Awake() {
@@ -50,6 +53,7 @@ public class Multiplayer : BaseUnityPlugin {
         KeybindManager.Add(this, DisconnectFromServer, () => new KeyboardShortcut(KeyCode.D, KeyCode.LeftControl));
         KeybindManager.Add(this, TestMethod, () => new KeyboardShortcut(KeyCode.X, KeyCode.LeftControl));
 
+        Instance = this;
         Log.Info($"Plugin {PluginInfo.PLUGIN_GUID} is loaded!");
     }
 
@@ -76,8 +80,8 @@ public class Multiplayer : BaseUnityPlugin {
             listener.PeerConnectedEvent += peer => {
                 int playerId = peer.Id;
                 var SpriteHolder = new GameObject($"Player_{playerId}");
-                activePlayers[playerId] = SpriteHolder;
-                activePlayers[playerId].transform.position = Vector3.zero;
+                activePlayers[playerId].PlayerObject = SpriteHolder;
+                activePlayers[playerId].PlayerObject.transform.position = Vector3.zero;
                 ToastManager.Toast($"New player connected with ID {playerId}");
 
                 dataWriter.Reset();
@@ -101,7 +105,7 @@ public class Multiplayer : BaseUnityPlugin {
                 int playerId = peer.Id;
 
                 if (activePlayers.ContainsKey(playerId)) {
-                    Destroy(activePlayers[playerId]); // Destroy the player's GameObject
+                    Destroy(activePlayers[playerId].PlayerObject); // Destroy the player's GameObject
                     activePlayers.Remove(playerId); // Remove from the dictionary
 
                     Log.Info($"Player {playerId} disconnected and removed.");
@@ -125,17 +129,19 @@ public class Multiplayer : BaseUnityPlugin {
                 float x = dataReader.GetFloat();
                 float y = dataReader.GetFloat();
                 float z = dataReader.GetFloat();
+                string animationState = dataReader.GetString();
 
                 // Check if it's the host player (ID 0) and skip instantiation for the client
                 if (!activePlayers.ContainsKey(playerId)) {
                     var SpriteHolder = new GameObject($"Player_{playerId}");
                     SpriteHolder.transform.position = new Vector3(x, y, z);  // Set the player's position
-                    activePlayers[playerId] = SpriteHolder;  // Add to active players
+                    activePlayers[playerId].PlayerObject= SpriteHolder;  // Add to active players
                     Log.Info($"New player with ID {playerId} instantiated on client.");
 
                 } else {
                     // If the player already exists, just update their position
-                    activePlayers[playerId].transform.position = new Vector3(x, y, z);
+                    activePlayers[playerId].PlayerObject.transform.position = new Vector3(x, y, z);
+                    activePlayers[playerId].AnimationState = animationState;
                 }
 
                 //Log.Info($"Player {playerId} position updated: ({x}, {y}, {z})");
@@ -153,7 +159,7 @@ public class Multiplayer : BaseUnityPlugin {
 
     private void SendPlayerDataToClient(NetPeer clientPeer, int playerId) {
         if (activePlayers.ContainsKey(playerId)) {
-            GameObject player = activePlayers[playerId];
+            GameObject player = activePlayers[playerId].PlayerObject;
             dataWriter.Reset();
             dataWriter.Put(playerId);  // Send player ID
             dataWriter.Put(player.transform.position.x);  // Send player position
@@ -179,6 +185,7 @@ public class Multiplayer : BaseUnityPlugin {
                 float x = dataReader.GetFloat();
                 float y = dataReader.GetFloat();
                 float z = dataReader.GetFloat();
+                string attack = dataReader.GetString();
 
                 if (!activePlayers.ContainsKey(localPlayerid) && playerId != localPlayerid) {
                     // Instantiate a new SpriteHolder for other players
@@ -187,9 +194,10 @@ public class Multiplayer : BaseUnityPlugin {
                     SpriteHolder = Instantiate(Player.i.transform.Find("RotateProxy").Find("SpriteHolder").gameObject);
                     SpriteHolder.name = $"Player_{playerId}";
                     SpriteHolder.transform.position = new Vector3(x, y, z);
-                    activePlayers[localPlayerid] = SpriteHolder;
+                    activePlayers[localPlayerid].PlayerObject = SpriteHolder;
                 } else if (playerId != localPlayerid) {
-                    activePlayers[localPlayerid].transform.position = new Vector3(x, y, z);
+                    activePlayers[localPlayerid].PlayerObject.transform.position = new Vector3(x, y, z);
+                    activePlayers[localPlayerid].PlayerObject.GetComponent<Animator>().Play(attack, 0, 0f);
                 }
             }
         };
@@ -224,7 +232,7 @@ public class Multiplayer : BaseUnityPlugin {
     // Method to destroy all player objects
     private void DestroyAllPlayers() {
         foreach (var player in activePlayers.Values) {
-            Destroy(player);  // Destroy all player objects on client
+            Destroy(player.PlayerObject);  // Destroy all player objects on client
         }
         activePlayers.Clear();  // Clear the dictionary after destroying all player objects
     }
@@ -261,6 +269,7 @@ public class Multiplayer : BaseUnityPlugin {
                         dataWriter.Put(Player.i.transform.position.x);  // Include position
                         dataWriter.Put(Player.i.transform.position.y);
                         dataWriter.Put(Player.i.transform.position.z);
+                        dataWriter.Put(localAnimationState);
 
                         foreach (var peer in netManager.ConnectedPeerList) {
                             peer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
@@ -274,9 +283,10 @@ public class Multiplayer : BaseUnityPlugin {
                 var player = playerEntry.Value;
                 dataWriter.Reset();
                 dataWriter.Put(playerId);  // Include player ID
-                dataWriter.Put(player.transform.position.x);  // Include position
-                dataWriter.Put(player.transform.position.y+6.5f);
-                dataWriter.Put(player.transform.position.z);
+                dataWriter.Put(player.PlayerObject.transform.position.x);  // Include position
+                dataWriter.Put(player.PlayerObject.transform.position.y+6.5f);
+                dataWriter.Put(player.PlayerObject.transform.position.z);
+                dataWriter.Put(player.AnimationState);
 
                 foreach (var peer in netManager.ConnectedPeerList) {
                     peer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
@@ -292,5 +302,15 @@ public class Multiplayer : BaseUnityPlugin {
         netManager?.Stop();
         DestroyAllPlayers();
         Log.Info("Networking stopped.");
+    }
+}
+
+public class PlayerData {
+    public GameObject PlayerObject { get; set; }
+    public string AnimationState { get; set; }
+
+    public PlayerData(GameObject playerObject, string animationState) {
+        PlayerObject = playerObject;
+        AnimationState = animationState;
     }
 }
