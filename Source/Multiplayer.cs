@@ -28,6 +28,8 @@ public class Multiplayer : BaseUnityPlugin {
     private EventBasedNetListener? listener;
     private NetPeer? serverPeer;
 
+    private bool isConnected;
+
     private Dictionary<int, GameObject> activePlayers = new();  // Keeps track of all connected players by their IDs
 
 
@@ -163,6 +165,9 @@ public class Multiplayer : BaseUnityPlugin {
 
 
     void ConnectToServer() {
+        if (isConnected)
+            return;
+
         listener.NetworkReceiveEvent += (fromPeer, dataReader, deliveryMethod, channel) => {
             if (dataReader.AvailableBytes == sizeof(int)) {
                 // Handle player ID assignment from server
@@ -194,6 +199,8 @@ public class Multiplayer : BaseUnityPlugin {
         netManager.Start();
         netManager.Connect("localhost", 9050, "game_key");
 
+
+        isConnected = true;
         // Register peer disconnection event
         listener.PeerDisconnectedEvent += (peer, disconnectInfo) => {
             int playerId = peer.Id;
@@ -201,6 +208,7 @@ public class Multiplayer : BaseUnityPlugin {
             // Destroy all player objects on client disconnect
             DestroyAllPlayers();
             Log.Info($"Client disconnected. All player objects destroyed.");
+            isConnected = false;
         };
     }
 
@@ -238,6 +246,7 @@ public class Multiplayer : BaseUnityPlugin {
             var peer = netManager.FirstPeer;
             peer?.Disconnect();
             ToastManager.Toast($"Disconnected from server. {peer.Id}");
+            isConnected = false;
         }
     }
 
