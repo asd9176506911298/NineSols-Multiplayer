@@ -188,19 +188,19 @@ public class Multiplayer : BaseUnityPlugin {
                 float z = dataReader.GetFloat();
                 string attack = dataReader.GetString();
 
-                if (!activePlayers.ContainsKey(localPlayerid) && playerId != localPlayerid) {
-                    Log.Info($"Create {localPlayerid} {playerId} {localPlayerid}");
-                    // Instantiate a new SpriteHolder for other players
-                    GameObject SpriteHolder;
-                    //SpriteHolder = Instantiate(Player.i.transform.Find("RotateProxy").Find("SpriteHolder").gameObject);
-                    SpriteHolder = new GameObject();
+                if (!activePlayers.ContainsKey(playerId) && playerId != localPlayerid) {
+                    GameObject SpriteHolder = Instantiate(Player.i.transform.Find("RotateProxy").Find("SpriteHolder").gameObject);
                     SpriteHolder.name = $"Player_{playerId}";
                     SpriteHolder.transform.position = new Vector3(x, y, z);
-                    activePlayers[localPlayerid].PlayerObject = SpriteHolder;
+
+                    // Add the new player to the activePlayers dictionary using the playerId
+                    activePlayers[playerId] = new PlayerData(SpriteHolder, "Idle");
                 } else if (playerId != localPlayerid) {
-                    activePlayers[localPlayerid].PlayerObject.transform.position = new Vector3(x, y, z);
-                    activePlayers[localPlayerid].PlayerObject.GetComponent<Animator>().Play(attack, 0, 0f);
+                    // Update the position and animation state for the existing player
+                    activePlayers[playerId].PlayerObject.transform.position = new Vector3(x, y, z);
+                    activePlayers[playerId].PlayerObject.GetComponent<Animator>().Play(attack, 0, 0f);
                 }
+
             }
         };
 
@@ -268,9 +268,9 @@ public class Multiplayer : BaseUnityPlugin {
                     if (playerId == localPlayerid) {
                         dataWriter.Reset();
                         dataWriter.Put(localPlayerid);  // Include player ID
-                        dataWriter.Put(1f);  // Include position
-                        dataWriter.Put(1f);
-                        dataWriter.Put(1f);
+                        dataWriter.Put(Player.i.transform.position.x);  // Include position
+                        dataWriter.Put(Player.i.transform.position.y);
+                        dataWriter.Put(Player.i.transform.position.z);
                         dataWriter.Put(localAnimationState);
 
                         foreach (var peer in netManager.ConnectedPeerList) {
