@@ -180,6 +180,7 @@ public class Multiplayer : BaseUnityPlugin {
                 float y = dataReader.GetFloat();
                 float z = dataReader.GetFloat();
 
+                Log.Info($"{localPlayerid} {playerId}");
                 if (!activePlayers.ContainsKey(localPlayerid) && playerId != localPlayerid) {
                     // Instantiate a new SpriteHolder for other players
                     GameObject SpriteHolder;
@@ -247,73 +248,40 @@ public class Multiplayer : BaseUnityPlugin {
     }
 
     private void Update() {
-        // Handle disconnections
-        var disconnectedPlayers = new List<int>();
+        if (!isServer.Value) {
+            foreach (var playerEntry in activePlayers) {
+                if (Player.i != null) {
+                    int playerId = playerEntry.Key;
+                    if (playerId == localPlayerid) {
+                        dataWriter.Reset();
+                        dataWriter.Put(localPlayerid);  // Include player ID
+                        dataWriter.Put(Player.i.transform.position.x);  // Include position
+                        dataWriter.Put(Player.i.transform.position.y);
+                        dataWriter.Put(Player.i.transform.position.z);
 
-        foreach (var playerEntry in activePlayers) {
-            int playerId = playerEntry.Key;
+                        foreach (var peer in netManager.ConnectedPeerList) {
+                            peer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
+                        }
+                    }   
+                }
+            }
+        } else {
+            foreach (var playerEntry in activePlayers) {
+                int playerId = playerEntry.Key;
+                var player = playerEntry.Value;
+                dataWriter.Reset();
+                dataWriter.Put(playerId);  // Include player ID
+                dataWriter.Put(player.transform.position.x);  // Include position
+                dataWriter.Put(player.transform.position.y+6.5f);
+                dataWriter.Put(player.transform.position.z);
 
-            // Check if player is still connected
-            if (!netManager.ConnectedPeerList.Exists(peer => peer.Id == playerId)) {
-                disconnectedPlayers.Add(playerId);
+                foreach (var peer in netManager.ConnectedPeerList) {
+                    peer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
+                }
             }
         }
-
-        // Remove disconnected players outside the loop
-        foreach (int playerId in disconnectedPlayers) {
-            HandlePlayerDisconnection(playerId);
-        }
-
-        // Synchronize player positions
-        SynchronizePlayerPositions();
-
-        // Poll network events
         netManager?.PollEvents();
     }
-
-    private void HandlePlayerDisconnection(int playerId) {
-        if (activePlayers.ContainsKey(playerId)) {
-            // Remove the player and log it
-            var player = activePlayers[playerId];
-            Destroy(player); // Destroy the player GameObject
-            activePlayers.Remove(playerId);
-            Log.Info($"Player {playerId} disconnected and removed.");
-        } else {
-            // Log only if disconnection logic is triggered unnecessarily
-            Log.Warning($"Attempted to remove Player {playerId}, but they were already removed.");
-        }
-    }
-
-    private void SynchronizePlayerPositions() {
-        foreach (var playerEntry in activePlayers) {
-            int playerId = playerEntry.Key;
-            var player = playerEntry.Value;
-
-            dataWriter.Reset();
-
-            // Server-specific adjustment
-            if (isServer.Value) {
-                dataWriter.Put(playerId);
-                dataWriter.Put(player.transform.position.x);
-                dataWriter.Put(player.transform.position.y + 6.5f);
-                dataWriter.Put(player.transform.position.z);
-            } else if (playerId == localPlayerid && Player.i != null) {
-                // If not server, send local player position
-                dataWriter.Put(localPlayerid);
-                dataWriter.Put(Player.i.transform.position.x);
-                dataWriter.Put(Player.i.transform.position.y);
-                dataWriter.Put(Player.i.transform.position.z);
-            }
-
-            // Send data to all connected peers
-            foreach (var peer in netManager.ConnectedPeerList) {
-                peer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
-            }
-        }
-    }
-
-
-
 
 
     private void OnDestroy() {
