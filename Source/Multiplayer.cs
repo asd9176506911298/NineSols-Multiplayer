@@ -121,9 +121,6 @@ public class Multiplayer : BaseUnityPlugin {
                 }
             };
 
-
-
-
             listener.NetworkReceiveEvent += (fromPeer, dataReader, deliveryMethod, channel) => {
                 try {
                     if (dataReader.AvailableBytes < sizeof(int)) {
@@ -136,6 +133,7 @@ public class Multiplayer : BaseUnityPlugin {
                     float y = dataReader.GetFloat();
                     float z = dataReader.GetFloat();
                     string state = dataReader.GetString();
+                    bool isFacingRight = dataReader.GetBool();
 
                     Log.Debug($"Received data for player {playerId}: ({x}, {y}, {z}), state: {state}");
 
@@ -148,6 +146,7 @@ public class Multiplayer : BaseUnityPlugin {
                         var player = activePlayers[playerId];
                         player.PlayerObject.transform.position = new Vector3(x, y, z);
                         player.AnimationState = state;
+                        player.isFacingRight = isFacingRight;
                     }
                 } catch (Exception ex) {
                     Log.Error($"Error in NetworkReceiveEvent: {ex.Message}\n{ex.StackTrace}");
@@ -173,6 +172,7 @@ public class Multiplayer : BaseUnityPlugin {
             dataWriter.Put(player.transform.position.y);  // Send player position
             dataWriter.Put(player.transform.position.z);  // Send player position
             dataWriter.Put(activePlayers[playerId].AnimationState);  // Send player position
+            dataWriter.Put(activePlayers[playerId].isFacingRight);  // Send player position
             clientPeer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
         }
     }
@@ -194,7 +194,8 @@ public class Multiplayer : BaseUnityPlugin {
                 float y = dataReader.GetFloat();
                 float z = dataReader.GetFloat();
                 string state = dataReader.GetString();
-                Log.Info($"playerId:{playerId} state:{state}");
+                bool facing = dataReader.GetBool();
+                //Log.Info($"playerId:{playerId} state:{state}");
                 if (!activePlayers.ContainsKey(localPlayerid) && playerId != localPlayerid) {
                     // Instantiate a new SpriteHolder for other players
                     GameObject SpriteHolder;
@@ -207,6 +208,11 @@ public class Multiplayer : BaseUnityPlugin {
                 } else if (playerId != localPlayerid) {
                     activePlayers[localPlayerid].PlayerObject.transform.position = new Vector3(x, y, z);
                     activePlayers[localPlayerid].PlayerObject.GetComponent<Animator>()?.Play(state, 0, 0f);
+                    activePlayers[localPlayerid].PlayerObject.transform.localScale = new Vector3(Mathf.Abs(transform.localScale.x) * (facing ? 1 : -1),
+                        transform.localScale.y,
+                        transform.localScale.z
+                    );
+
                 }
             }
         };
@@ -249,10 +255,11 @@ public class Multiplayer : BaseUnityPlugin {
 
 
     void TestMethod() {
+        ToastManager.Toast(Player.i.Facing);
+        return;
         foreach (var xx in activePlayers) {
             ToastManager.Toast($"{xx.Key} {xx.Value}");
         }
-        return;
         dataWriter.Reset();
         dataWriter.Put(1.2f);
         netManager.FirstPeer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
@@ -279,7 +286,8 @@ public class Multiplayer : BaseUnityPlugin {
                         dataWriter.Put(Player.i.transform.position.y);
                         dataWriter.Put(Player.i.transform.position.z);
                         dataWriter.Put(localAnimationState);
-                        Log.Info(localAnimationState);
+                        dataWriter.Put(Player.i.Facing.ToString().Equals("Right") ? true : false);
+                        //Log.Info(Player.i.Facing.ToString().Equals("Right") ? true : false);
 
                         foreach (var peer in netManager.ConnectedPeerList) {
                             peer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
@@ -297,6 +305,7 @@ public class Multiplayer : BaseUnityPlugin {
                 dataWriter.Put(player.transform.position.y+6.5f);
                 dataWriter.Put(player.transform.position.z);
                 dataWriter.Put(playerEntry.Value.AnimationState);
+                dataWriter.Put(playerEntry.Value.isFacingRight);
                 //Log.Info(playerEntry.Value.AnimationState);
 
                 foreach (var peer in netManager.ConnectedPeerList) {
@@ -319,6 +328,7 @@ public class Multiplayer : BaseUnityPlugin {
 public class PlayerData {
     public GameObject PlayerObject { get; set; }
     public string AnimationState { get; set; }
+    public bool isFacingRight{ get; set; }
 
     public PlayerData(GameObject playerObject, string animationState) {
         PlayerObject = playerObject;
