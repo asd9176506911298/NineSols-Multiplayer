@@ -46,7 +46,7 @@ public class Multiplayer : BaseUnityPlugin {
 
         KeybindManager.Add(this, InitializeNetworking, () => somethingKeyboardShortcut.Value);
         KeybindManager.Add(this, DisconnectFromServer, () => new KeyboardShortcut(KeyCode.D, KeyCode.LeftControl));
-        KeybindManager.Add(this, ConnectToServer, () => new KeyboardShortcut(KeyCode.X, KeyCode.LeftControl));
+        KeybindManager.Add(this, TestMethod, () => new KeyboardShortcut(KeyCode.X, KeyCode.LeftControl));
 
         Log.Info($"Plugin {PluginInfo.PLUGIN_GUID} is loaded!");
     }
@@ -76,7 +76,7 @@ public class Multiplayer : BaseUnityPlugin {
                 var SpriteHolder = new GameObject($"Player_{playerId}");
                 activePlayers[playerId] = SpriteHolder;
                 activePlayers[playerId].transform.position = Vector3.zero;
-                Log.Info($"New player connected with ID {playerId}");
+                ToastManager.Toast($"New player connected with ID {playerId}");
 
                 dataWriter.Reset();
                 dataWriter.Put(playerId);
@@ -97,7 +97,9 @@ public class Multiplayer : BaseUnityPlugin {
 
             listener.PeerDisconnectedEvent += (peer, disconnectInfo) => {
                 int playerId = peer.Id;
-
+                foreach(var xx in activePlayers) {
+                    ToastManager.Toast($"{xx.Key} {xx.Value}"); 
+                }
                 if (activePlayers.ContainsKey(playerId)) {
                     Destroy(activePlayers[playerId]); // Destroy the player's GameObject
                     activePlayers.Remove(playerId); // Remove from the dictionary
@@ -112,6 +114,9 @@ public class Multiplayer : BaseUnityPlugin {
                             connectedPeer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
                         }
                     }
+                }
+                foreach (var xx in activePlayers) {
+                    ToastManager.Toast($"{xx.Key} {xx.Value}");
                 }
             };
 
@@ -175,7 +180,6 @@ public class Multiplayer : BaseUnityPlugin {
                 float y = dataReader.GetFloat();
                 float z = dataReader.GetFloat();
 
-                Log.Info($"{localPlayerid} {playerId}");
                 if (!activePlayers.ContainsKey(localPlayerid) && playerId != localPlayerid) {
                     // Instantiate a new SpriteHolder for other players
                     GameObject SpriteHolder;
@@ -225,6 +229,10 @@ public class Multiplayer : BaseUnityPlugin {
 
 
     void TestMethod() {
+        foreach (var xx in activePlayers) {
+            ToastManager.Toast($"{xx.Key} {xx.Value}");
+        }
+        return;
         dataWriter.Reset();
         dataWriter.Put(1.2f);
         netManager.FirstPeer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
@@ -234,47 +242,78 @@ public class Multiplayer : BaseUnityPlugin {
         if (netManager?.IsRunning == true) {
             var peer = netManager.FirstPeer;
             peer?.Disconnect();
-            ToastManager.Toast("Disconnected from server.");
+            ToastManager.Toast($"Disconnected from server. {peer.Id}");
         }
     }
 
     private void Update() {
-        if (!isServer.Value) {
-            foreach (var playerEntry in activePlayers) {
-                if (Player.i != null) {
-                    int playerId = playerEntry.Key;
-                    Log.Info($"Client playerid{playerId} localPlayerid:{localPlayerid}");
-                    if (playerId == localPlayerid) {
-                        dataWriter.Reset();
-                        dataWriter.Put(localPlayerid);  // Include player ID
-                        dataWriter.Put(Player.i.transform.position.x);  // Include position
-                        dataWriter.Put(Player.i.transform.position.y);
-                        dataWriter.Put(Player.i.transform.position.z);
+        // Handle disconnections
+        var disconnectedPlayers = new List<int>();
 
-                        foreach (var peer in netManager.ConnectedPeerList) {
-                            peer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
-                        }
-                    }   
-                }
-            }
-        } else {
-            foreach (var playerEntry in activePlayers) {
-                int playerId = playerEntry.Key;
-                var player = playerEntry.Value;
-                Log.Info($"Server playerid{playerId} localPlayerid:{localPlayerid}");
-                dataWriter.Reset();
-                dataWriter.Put(playerId);  // Include player ID
-                dataWriter.Put(player.transform.position.x);  // Include position
-                dataWriter.Put(player.transform.position.y+6.5f);
-                dataWriter.Put(player.transform.position.z);
+        foreach (var playerEntry in activePlayers) {
+            int playerId = playerEntry.Key;
 
-                foreach (var peer in netManager.ConnectedPeerList) {
-                    peer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
-                }
+            // Check if player is still connected
+            if (!netManager.ConnectedPeerList.Exists(peer => peer.Id == playerId)) {
+                disconnectedPlayers.Add(playerId);
             }
         }
+
+        // Remove disconnected players outside the loop
+        foreach (int playerId in disconnectedPlayers) {
+            HandlePlayerDisconnection(playerId);
+        }
+
+        // Synchronize player positions
+        SynchronizePlayerPositions();
+
+        // Poll network events
         netManager?.PollEvents();
     }
+
+    private void HandlePlayerDisconnection(int playerId) {
+        if (activePlayers.ContainsKey(playerId)) {
+            // Remove the player and log it
+            var player = activePlayers[playerId];
+            Destroy(player); // Destroy the player GameObject
+            activePlayers.Remove(playerId);
+            Log.Info($"Player {playerId} disconnected and removed.");
+        } else {
+            // Log only if disconnection logic is triggered unnecessarily
+            Log.Warning($"Attempted to remove Player {playerId}, but they were already removed.");
+        }
+    }
+
+    private void SynchronizePlayerPositions() {
+        foreach (var playerEntry in activePlayers) {
+            int playerId = playerEntry.Key;
+            var player = playerEntry.Value;
+
+            dataWriter.Reset();
+
+            // Server-specific adjustment
+            if (isServer.Value) {
+                dataWriter.Put(playerId);
+                dataWriter.Put(player.transform.position.x);
+                dataWriter.Put(player.transform.position.y + 6.5f);
+                dataWriter.Put(player.transform.position.z);
+            } else if (playerId == localPlayerid && Player.i != null) {
+                // If not server, send local player position
+                dataWriter.Put(localPlayerid);
+                dataWriter.Put(Player.i.transform.position.x);
+                dataWriter.Put(Player.i.transform.position.y);
+                dataWriter.Put(Player.i.transform.position.z);
+            }
+
+            // Send data to all connected peers
+            foreach (var peer in netManager.ConnectedPeerList) {
+                peer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
+            }
+        }
+    }
+
+
+
 
 
     private void OnDestroy() {
