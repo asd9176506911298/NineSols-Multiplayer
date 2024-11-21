@@ -72,11 +72,6 @@ namespace Server {
                 dataReader.Recycle();
             };
 
-
-
-
-
-
             while (!Console.KeyAvailable) {
                 server.PollEvents();
                 Thread.Sleep(15);
@@ -94,32 +89,39 @@ namespace Server {
         // Broadcast player positions to all clients
         private static void BroadcastPlayerPositions() {
             foreach (var peer in server.ConnectedPeerList) {
-                writer.Reset();
+                
 
                 // Send all player positions to each client
                 foreach (var player in players.Values) {
+                    writer.Reset();
+                    writer.Put("Position");  // Send message type
                     writer.Put(player.PlayerId);  // Send player ID
-
+                    writer.Put(player.x);  // Send player X position
+                    writer.Put(player.y);  // Send player Y position
+                    writer.Put(player.z);  // Send player Z position
+                    peer.Send(writer, DeliveryMethod.ReliableOrdered);  // Send to each peer
                 }
-
-                peer.Send(writer, DeliveryMethod.ReliableOrdered);  // Send to each peer
             }
         }
+
 
         // Method to handle position updates
         private static void HandlePositionUpdate(NetPeer fromPeer, NetDataReader dataReader) {
             int playerId = fromPeer.Id;  // Get the player ID from the peer
-
             // Read the new position from the data
             float x = dataReader.GetFloat();
             float y = dataReader.GetFloat();
             float z = dataReader.GetFloat();
-
             // Update the player position in the dictionary
-            if (players.ContainsKey(playerId)) {
-                PlayerData player = players[playerId];
+            if (!players.ContainsKey(playerId)) {
+                PlayerData player = players[playerId]; 
             }
+            players[playerId].x = x;
+            players[playerId].y = y;
+            players[playerId].z = z;
+            players[playerId].PlayerId = playerId;
 
+            BroadcastPlayerPositions();
             Console.WriteLine($"Player {playerId} position updated: {x}, {y}, {z}");
         }
 

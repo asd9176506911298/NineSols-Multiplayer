@@ -28,7 +28,7 @@ public class Multiplayer : BaseUnityPlugin {
 
         harmony = Harmony.CreateAndPatchAll(typeof(Multiplayer).Assembly);
 
-        KeybindManager.Add(this, ConnectToServer, () => new KeyboardShortcut(KeyCode.X));
+        KeybindManager.Add(this, ConnectToServer, () => new KeyboardShortcut(KeyCode.S));
         KeybindManager.Add(this, DisconnectFromServer, () => new KeyboardShortcut(KeyCode.C));
         KeybindManager.Add(this, SendPosition, () => new KeyboardShortcut(KeyCode.V));
 
@@ -75,16 +75,15 @@ public class Multiplayer : BaseUnityPlugin {
             ToastManager.Toast("No connection to the server!");
             return;
         }
-
         // Reset the writer to clear any previous data
         dataWriter.Reset();
         dataWriter.Put("Position");
 
         // Assuming player's position is stored in the GameObject's transform
-        Vector3 position = transform.position;  // Get player's position from the GameObject
-        dataWriter.Put(position.x);
-        dataWriter.Put(position.y);
-        dataWriter.Put(position.z);
+        Vector3 position = Player.i.transform.position;  // Get player's position from the GameObject
+        dataWriter.Put(Player.i.transform.position.x);
+        dataWriter.Put(Player.i.transform.position.y);
+        dataWriter.Put(Player.i.transform.position.z);
 
         // Send the data to the server
         client.FirstPeer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
@@ -94,13 +93,16 @@ public class Multiplayer : BaseUnityPlugin {
     void HandleReceivedData(NetPeer fromPeer, NetDataReader dataReader) {
         // Handle the received data (e.g., player position updates)
         string messageType = dataReader.GetString();
+        int playerId = dataReader.GetInt();
         if (messageType == "Position") {
-            int playerId = dataReader.GetInt();
             float x = dataReader.GetFloat();
             float y = dataReader.GetFloat();
             float z = dataReader.GetFloat();
+            ToastManager.Toast($"Player:{playerId} {x} {y} {z}");
             Vector3 pos = new Vector3(x, y, z);
             UpdatePlayerData(playerId, pos);
+        } else {
+            ToastManager.Toast(messageType);
         }
     }
 
@@ -115,8 +117,6 @@ public class Multiplayer : BaseUnityPlugin {
             playerObjects.Add(playerId, new PlayerData(playerObject, position));
         }
     }
-
-
 
     void Update() {
         client?.PollEvents();  // Poll for incoming events
