@@ -104,10 +104,14 @@ namespace Multiplayer {
                 }
             } else if (messageType == "localPlayerId") {
                 localPlayerId = reader.GetInt();
-            } else if(messageType == "DestoryDisconnectObject") {
+            } else if (messageType == "DestoryDisconnectObject") {
                 int playerId = reader.GetInt();
-                Destroy(playerObjects[playerId].PlayerObject);
-                playerObjects.Remove(playerId);
+
+                if (playerObjects.ContainsKey(playerId)) {
+                    Destroy(playerObjects[playerId].PlayerObject);  // Destroy the player object
+                    playerObjects.Remove(playerId);  // Remove player from dictionary
+                    Log.Info($"Destroyed player object with ID {playerId}.");
+                }
             }
         }
 
