@@ -1,43 +1,82 @@
 ﻿using LiteNetLib;
 using LiteNetLib.Utils;
 using System;
+using System.Collections.Generic;
 using System.Threading;
+using UnityEngine;
 
-namespace Server
-{
-    internal class Server
-    {
-        static void Main(string[] args)
-        {
+namespace Server {
+    internal class Server {
+        static NetManager server = null;
+        static NetDataWriter writer = null;
+
+        // Dictionary to store player data by their NetPeer (you could also use PlayerId if needed)
+        static Dictionary<int, PlayerData> players = new Dictionary<int, PlayerData>();
+
+        static void Main(string[] args) {
             Console.WriteLine("Hello World");
 
             EventBasedNetListener listener = new EventBasedNetListener();
-            NetManager server = new NetManager(listener);
+            server = new NetManager(listener);
+            writer = new NetDataWriter();
             server.Start(9050 /* port */);
 
-            listener.ConnectionRequestEvent += request =>
-            {
+            listener.ConnectionRequestEvent += request => {
                 if (server.ConnectedPeersCount < 10 /* max connections */)
                     request.AcceptIfKey("SomeConnectionKey");
                 else
                     request.Reject();
             };
 
-            listener.PeerConnectedEvent += fromPeer =>
-            {
+            listener.PeerConnectedEvent += fromPeer => {
                 Console.WriteLine("We got connection: {0}", fromPeer);  // Show peer ip
-                NetDataWriter writer = new NetDataWriter();         // Create writer class
-                writer.Put($"Player  Connect to Server");                        // Put some string
 
-                foreach(var peer in server.ConnectedPeerList) {
-                    if(peer != fromPeer)
-                        peer.Send(writer, DeliveryMethod.ReliableOrdered);  // Send with reliability
+
+                // Create and add player data
+                PlayerData newPlayer = new PlayerData {
+                    PlayerId = fromPeer.Id,
+                    PlayerName = $"Player{fromPeer.Id}", // Or retrieve player name if applicable
+                    Peer = fromPeer,
+                    pos = Vector3.zero
+                };
+
+                players[fromPeer.Id] = newPlayer;  // Save player data using their NetPeer ID as the key
+
+                writer.Reset();
+                writer.Put($"Player {fromPeer.Id} Connect to Server");  // Put some string
+                BoardCastToClients(fromPeer);
+            };
+
+            listener.PeerDisconnectedEvent += (fromPeer, DisconnectInfo) => {
+                Console.WriteLine("We got Disconnect: {0}", fromPeer);  // Show peer ip
+                writer.Reset();
+                writer.Put($"Player {fromPeer.Id} DisConnected Server");  // Put some string
+
+                // Remove player data when disconnected
+                players.Remove(fromPeer.Id);
+
+                BoardCastToClients(fromPeer);
+            };
+
+            listener.NetworkReceiveEvent += (fromPeer, dataReader, deliveryMethod, channel) => {
+                string messageType = dataReader.GetString();
+                switch (messageType) {
+                    case "Position":
+                        HandlePositionUpdate(fromPeer, dataReader);
+                        break;
+                    case "Action":
+                        HandlePlayerAction(fromPeer, dataReader);
+                        break;
+                    default:
+                        Console.WriteLine($"Unknown message type: {messageType}");
+                        break;
                 }
+                dataReader.Recycle();
             };
 
-            listener.PeerDisconnectedEvent += (peer, DisconnectInfo) => {
-                Console.WriteLine($"Disconnect{peer}");  // Show peer ip
-            };
+
+
+
 
 
             while (!Console.KeyAvailable) {
@@ -46,5 +85,67 @@ namespace Server
             }
             server.Stop();
         }
+
+        static void BoardCastToClients(NetPeer fromPeer) {
+            foreach (var peer in server.ConnectedPeerList) {
+                if (peer != fromPeer)
+                    peer.Send(writer, DeliveryMethod.ReliableOrdered);  // Send with reliability
+            }
+        }
+
+        // Broadcast player positions to all clients
+        private static void BroadcastPlayerPositions() {
+            foreach (var peer in server.ConnectedPeerList) {
+                writer.Reset();
+
+                // Send all player positions to each client
+                foreach (var player in players.Values) {
+                    writer.Put(player.PlayerId);  // Send player ID
+
+                }
+
+                peer.Send(writer, DeliveryMethod.ReliableOrdered);  // Send to each peer
+            }
+        }
+
+        // Method to handle position updates
+        private static void HandlePositionUpdate(NetPeer fromPeer, NetDataReader dataReader) {
+            int playerId = fromPeer.Id;  // Get the player ID from the peer
+
+            // Read the new position from the data
+            float x = dataReader.GetFloat();
+            float y = dataReader.GetFloat();
+            float z = dataReader.GetFloat();
+
+            // Update the player position in the dictionary
+            if (players.ContainsKey(playerId)) {
+                PlayerData player = players[playerId];
+            }
+
+            Console.WriteLine($"Player {playerId} position updated: {x}, {y}, {z}");
+        }
+
+        // Method to handle player actions (e.g., jumping, shooting, etc.)
+        private static void HandlePlayerAction(NetPeer fromPeer, NetDataReader dataReader) {
+            int playerId = fromPeer.Id;  // Get the player ID from the peer
+
+            // Read action data from the dataReader (e.g., action type)
+            string actionType = dataReader.GetString();
+            Console.WriteLine($"Player {playerId} performed action: {actionType}");
+
+            // Handle the action accordingly, for example:
+            switch (actionType) {
+                case "Jump":
+                    Console.WriteLine($"Player {playerId} jumped!");
+                    break;
+                case "Shoot":
+                    Console.WriteLine($"Player {playerId} shot!");
+                    break;
+                default:
+                    Console.WriteLine($"Unknown action: {actionType}");
+                    break;
+            }
+        }
+
     }
 }

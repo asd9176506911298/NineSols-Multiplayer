@@ -38,8 +38,12 @@
       <HintPath>..\Source\lib\LiteNetLib.dll</HintPath>
     </Reference>
     <Reference Include="System" />
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>..\Source\lib\UnityEngine.CoreModule.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="PlayerData.cs" />
     <Compile Include="Server.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
