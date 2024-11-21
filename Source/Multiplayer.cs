@@ -17,21 +17,14 @@ namespace Multiplayer;
 [BepInPlugin(PluginInfo.PLUGIN_GUID, PluginInfo.PLUGIN_NAME, PluginInfo.PLUGIN_VERSION)]
 public class Multiplayer : BaseUnityPlugin {
     public static Multiplayer Instance { get; private set; }
-    private ConfigEntry<bool> isServer = null!;
     private ConfigEntry<KeyboardShortcut> somethingKeyboardShortcut = null!;
 
     private Harmony harmony = null!;
-    private NetManager? netManager;
+    private NetManager? client;
     private NetDataWriter dataWriter = new();
-    GameObject tmpPlayer;
 
-    private int localPlayerid;
 
     private EventBasedNetListener? listener;
-    private NetPeer? serverPeer;
-
-    private bool isConnected;
-    public string localAnimationState = "";
 
     private void Awake() {
         Log.Init(Logger);
@@ -39,45 +32,45 @@ public class Multiplayer : BaseUnityPlugin {
 
         harmony = Harmony.CreateAndPatchAll(typeof(Multiplayer).Assembly);
 
-        // Config for enabling server/client mode
-        isServer = Config.Bind("Network", "IsServer", true, "Set to true to run as server, false for client");
 
-        // Other configurations
-        somethingKeyboardShortcut = Config.Bind("General.Something", "Shortcut",
-            new KeyboardShortcut(KeyCode.H, KeyCode.LeftControl), "Shortcut to execute");
-
-        KeybindManager.Add(this, InitializeNetworking, () => somethingKeyboardShortcut.Value);
+        KeybindManager.Add(this, ConnectToServer, () => new KeyboardShortcut(KeyCode.X));
+        KeybindManager.Add(this, DisconnectFromServer, () => new KeyboardShortcut(KeyCode.C));
 
         Instance = this;
         Log.Info($"Plugin {PluginInfo.PLUGIN_GUID} is loaded!");
     }
 
-    void Start() {
-        InitializeNetworking();
+    void DisconnectFromServer() {
+        var peer = client.FirstPeer;
+        peer?.Disconnect();
+        ToastManager.Toast($"Disconnected from server. {peer.Id}");
     }
 
-    private void InitializeNetworking() {
-        EventBasedNetListener listener = new EventBasedNetListener();
-        NetManager client = new NetManager(listener);
+    private void ConnectToServer() {
+        ToastManager.Toast("ConnectToServer");
+        listener = new EventBasedNetListener();
+        client = new NetManager(listener) { AutoRecycle = true };
         client.Start();
-        client.Connect("localhost" /* host ip or name */, 9050 /* port */, "SomeConnectionKey" /* text key or NetDataWriter */);
+        client.Connect("localhost", 9050 , "SomeConnectionKey");
         listener.NetworkReceiveEvent += (fromPeer, dataReader, deliveryMethod, channel) =>
         {
-            ToastManager.Toast("123");
+            ToastManager.Toast($"Recive From Sever {dataReader.GetString()}");
             dataReader.Recycle();
         };
-
-        while (!Console.KeyAvailable) {
-            client.PollEvents();
-            Thread.Sleep(15);
-        }
-
-        client.Stop();
+         
+        listener.PeerDisconnectedEvent += (peer,DisconnectInfo) => {
+            ToastManager.Toast($"Connect {peer}");
+        };
     } 
+
+    void Update() {
+        client.PollEvents();
+        Thread.Sleep(15);
+    }
 
     private void OnDestroy() {
         harmony.UnpatchSelf();
-        netManager?.Stop();
+        client?.Stop();
     }
 }
 

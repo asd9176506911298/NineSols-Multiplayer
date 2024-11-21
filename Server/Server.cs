@@ -23,13 +23,22 @@ namespace Server
                     request.Reject();
             };
 
-            listener.PeerConnectedEvent += peer =>
+            listener.PeerConnectedEvent += fromPeer =>
             {
-                Console.WriteLine("We got connection: {0}", peer);  // Show peer ip
+                Console.WriteLine("We got connection: {0}", fromPeer);  // Show peer ip
                 NetDataWriter writer = new NetDataWriter();         // Create writer class
-                writer.Put("Hello client!");                        // Put some string
-                peer.Send(writer, DeliveryMethod.ReliableOrdered);  // Send with reliability
+                writer.Put($"Player  Connect to Server");                        // Put some string
+
+                foreach(var peer in server.ConnectedPeerList) {
+                    if(peer != fromPeer)
+                        peer.Send(writer, DeliveryMethod.ReliableOrdered);  // Send with reliability
+                }
             };
+
+            listener.PeerDisconnectedEvent += (peer, DisconnectInfo) => {
+                Console.WriteLine($"Disconnect{peer}");  // Show peer ip
+            };
+
 
             while (!Console.KeyAvailable) {
                 server.PollEvents();
