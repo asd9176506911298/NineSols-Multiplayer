@@ -39,11 +39,6 @@ namespace Multiplayer {
         }
 
         private void ConnectToServer() {
-            if (client.IsRunning) {
-                ToastManager.Toast("Already connected to a server.");
-                return; // If client is already connected, do not attempt to connect again
-            }
-
             ToastManager.Toast("Connecting to server...");
             client.Start();
             client.Connect("localhost", 9050, "SomeConnectionKey");
@@ -59,7 +54,6 @@ namespace Multiplayer {
                 DestroyAllPlayerObjects();
             };
         }
-
 
         private void DisconnectFromServer() {
             client?.DisconnectAll();
@@ -110,14 +104,10 @@ namespace Multiplayer {
                 }
             } else if (messageType == "localPlayerId") {
                 localPlayerId = reader.GetInt();
-            } else if (messageType == "DestoryDisconnectObject") {
+            } else if(messageType == "DestoryDisconnectObject") {
                 int playerId = reader.GetInt();
-
-                if (playerObjects.ContainsKey(playerId)) {
-                    Destroy(playerObjects[playerId].PlayerObject);  // Destroy the player object
-                    playerObjects.Remove(playerId);  // Remove player from dictionary
-                    Log.Info($"Destroyed player object with ID {playerId}.");
-                }
+                Destroy(playerObjects[playerId].PlayerObject);
+                playerObjects.Remove(playerId);
             }
         }
 
