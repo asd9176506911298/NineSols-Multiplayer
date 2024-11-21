@@ -3,7 +3,6 @@ using LiteNetLib.Utils;
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using UnityEngine;
 
 namespace Server {
     internal class Server {
@@ -37,7 +36,9 @@ namespace Server {
                     PlayerId = fromPeer.Id,
                     PlayerName = $"Player{fromPeer.Id}", // Or retrieve player name if applicable
                     Peer = fromPeer,
-                    pos = Vector3.zero
+                    x = 0f,
+                    y = 0f,
+                    z = 0f
                 };
 
                 players[fromPeer.Id] = newPlayer;  // Save player data using their NetPeer ID as the key
@@ -63,9 +64,6 @@ namespace Server {
                 switch (messageType) {
                     case "Position":
                         HandlePositionUpdate(fromPeer, dataReader);
-                        break;
-                    case "Action":
-                        HandlePlayerAction(fromPeer, dataReader);
                         break;
                     default:
                         Console.WriteLine($"Unknown message type: {messageType}");
@@ -125,27 +123,6 @@ namespace Server {
             Console.WriteLine($"Player {playerId} position updated: {x}, {y}, {z}");
         }
 
-        // Method to handle player actions (e.g., jumping, shooting, etc.)
-        private static void HandlePlayerAction(NetPeer fromPeer, NetDataReader dataReader) {
-            int playerId = fromPeer.Id;  // Get the player ID from the peer
-
-            // Read action data from the dataReader (e.g., action type)
-            string actionType = dataReader.GetString();
-            Console.WriteLine($"Player {playerId} performed action: {actionType}");
-
-            // Handle the action accordingly, for example:
-            switch (actionType) {
-                case "Jump":
-                    Console.WriteLine($"Player {playerId} jumped!");
-                    break;
-                case "Shoot":
-                    Console.WriteLine($"Player {playerId} shot!");
-                    break;
-                default:
-                    Console.WriteLine($"Unknown action: {actionType}");
-                    break;
-            }
-        }
 
     }
 }
