@@ -114,11 +114,13 @@ public class Multiplayer : BaseUnityPlugin {
         ToastManager.Toast($"UpdatePlayerData {playerId} {localPlayerId} {playerId != localPlayerId}");
         if (playerObjects.ContainsKey(playerId)) {
             // Update existing player data
+            if (playerId == localPlayerId) return;
             playerObjects[playerId].Position = position;
             playerObjects[playerId].PlayerObject.transform.position = position;  // Update GameObject's position
-        } else {
+        } else{
             // Add new player data
-            GameObject playerObject = Instantiate(new GameObject(), position, Quaternion.identity);  // Assuming you have a prefab
+            GameObject playerObject = Instantiate(Player.i.transform.Find("RotateProxy").Find("SpriteHolder").gameObject, position, Quaternion.identity);  // Assuming you have a prefab
+            playerObject.name = playerId.ToString();
             playerObjects.Add(playerId, new PlayerData(playerObject, position));
         }
     }
