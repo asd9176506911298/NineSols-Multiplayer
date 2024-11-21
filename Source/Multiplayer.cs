@@ -21,6 +21,8 @@ public class Multiplayer : BaseUnityPlugin {
     private EventBasedNetListener? listener;
     private Dictionary<int, PlayerData> playerObjects = new Dictionary<int, PlayerData>();  // Store player data by their ID
 
+    private int localPlayerId = -1;
+
 
     private void Awake() {
         Log.Init(Logger);
@@ -93,20 +95,23 @@ public class Multiplayer : BaseUnityPlugin {
     void HandleReceivedData(NetPeer fromPeer, NetDataReader dataReader) {
         // Handle the received data (e.g., player position updates)
         string messageType = dataReader.GetString();
-        int playerId = dataReader.GetInt();
         if (messageType == "Position") {
+            int playerId = dataReader.GetInt();
             float x = dataReader.GetFloat();
             float y = dataReader.GetFloat();
             float z = dataReader.GetFloat();
             ToastManager.Toast($"Player:{playerId} {x} {y} {z}");
             Vector3 pos = new Vector3(x, y, z);
             UpdatePlayerData(playerId, pos);
+        }else if (messageType == "localPlayerId") {
+            localPlayerId = dataReader.GetInt();
         } else {
             ToastManager.Toast(messageType);
         }
     }
 
     void UpdatePlayerData(int playerId, Vector3 position) {
+        ToastManager.Toast($"UpdatePlayerData {playerId} {localPlayerId} {playerId != localPlayerId}");
         if (playerObjects.ContainsKey(playerId)) {
             // Update existing player data
             playerObjects[playerId].Position = position;

@@ -42,6 +42,11 @@ namespace Server {
                 };
 
                 players[fromPeer.Id] = newPlayer;  // Save player data using their NetPeer ID as the key
+                Console.WriteLine($"ppppid:${fromPeer.Id}");
+                writer.Reset();
+                writer.Put("localPlayerId");  // Put some string
+                writer.Put(fromPeer.Id);  // Put some string
+                fromPeer.Send(writer, DeliveryMethod.ReliableOrdered);  // Send with reliability
 
                 writer.Reset();
                 writer.Put($"Player {fromPeer.Id} Connect to Server");  // Put some string
