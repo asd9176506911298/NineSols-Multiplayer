@@ -67,6 +67,10 @@ public class Multiplayer : BaseUnityPlugin {
                 Destroy(playerObjects[peer.Id].PlayerObject);  // Remove player GameObject
                 playerObjects.Remove(peer.Id);  // Remove player data
             }
+
+            foreach(var x in playerObjects) {
+                Destroy(x.Value.PlayerObject);
+            }
             ToastManager.Toast($"Disconnected from server: Peer ID: {peer.Id}");
         };
 
@@ -103,6 +107,7 @@ public class Multiplayer : BaseUnityPlugin {
             ToastManager.Toast($"Player:{playerId} {x} {y} {z}");
             Vector3 pos = new Vector3(x, y, z);
             UpdatePlayerData(playerId, pos);
+            ToastManager.Toast("UpdatePlayerData");
         }else if (messageType == "localPlayerId") {
             localPlayerId = dataReader.GetInt();
         } else {
@@ -127,7 +132,6 @@ public class Multiplayer : BaseUnityPlugin {
 
     void Update() {
         client?.PollEvents();  // Poll for incoming events
-        Thread.Sleep(15);  // Reduce CPU usage (use with caution)
     }
 
     private void OnDestroy() {
