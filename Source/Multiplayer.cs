@@ -49,9 +49,17 @@ namespace Multiplayer {
             };
 
             listener.PeerDisconnectedEvent += (peer, disconnectInfo) => {
-                playerObjects.Remove(peer.Id);
                 ToastManager.Toast($"Disconnected: Peer ID: {peer.Id}");
+
+                // Destroy all player objects
+                foreach (var playerData in playerObjects.Values) {
+                    if (playerData.PlayerObject != null) {
+                        Destroy(playerData.PlayerObject);
+                    }
+                }
+                playerObjects.Clear();
             };
+
         }
 
         private void DisconnectFromServer() {
@@ -105,8 +113,15 @@ namespace Multiplayer {
         }
 
         private void Update() {
+            // Check if the client is connected before sending the position
+            if (client?.FirstPeer != null && client.FirstPeer.ConnectionState == ConnectionState.Connected) {
+                SendPosition();
+            }
+
+            // Poll network events
             client?.PollEvents();
         }
+
 
         private void OnDestroy() {
             harmony.UnpatchSelf();
