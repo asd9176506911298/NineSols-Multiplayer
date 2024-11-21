@@ -50,22 +50,27 @@ namespace Multiplayer {
 
             listener.PeerDisconnectedEvent += (peer, disconnectInfo) => {
                 ToastManager.Toast($"Disconnected: Peer ID: {peer.Id}");
-
-                // Destroy all player objects
-                foreach (var playerData in playerObjects.Values) {
-                    if (playerData.PlayerObject != null) {
-                        Destroy(playerData.PlayerObject);
-                    }
-                }
-                playerObjects.Clear();
+                // Clear player objects on disconnection
+                DestroyAllPlayerObjects();
             };
-
         }
 
         private void DisconnectFromServer() {
             client?.DisconnectAll();
+            DestroyAllPlayerObjects();
+
             ToastManager.Toast("Disconnected from server.");
         }
+
+        private void DestroyAllPlayerObjects() {
+            foreach (var playerData in playerObjects.Values) {
+                if (playerData.PlayerObject != null) {
+                    Destroy(playerData.PlayerObject);
+                }
+            }
+            playerObjects.Clear();
+        }
+
 
         private void SendPosition() {
             if (client.FirstPeer == null) {
@@ -77,12 +82,14 @@ namespace Multiplayer {
             dataWriter.Put("Position");
             Vector3 position = Player.i.transform.position; // Use your player's position
             dataWriter.Put(position.x);
-            dataWriter.Put(position.y);
+            dataWriter.Put(position.y+6.5f);
             dataWriter.Put(position.z);
             client.FirstPeer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
         }
 
         private void HandleReceivedData(NetPeer peer, NetDataReader reader) {
+            if (peer.ConnectionState != ConnectionState.Connected) return; // Ensure only active peers are processed
+
             string messageType = reader.GetString();
 
             if (messageType == "Position") {
@@ -97,6 +104,10 @@ namespace Multiplayer {
                 }
             } else if (messageType == "localPlayerId") {
                 localPlayerId = reader.GetInt();
+            } else if(messageType == "DestoryDisconnectObject") {
+                int playerId = reader.GetInt();
+                Destroy(playerObjects[playerId].PlayerObject);
+                playerObjects.Remove(playerId);
             }
         }
 

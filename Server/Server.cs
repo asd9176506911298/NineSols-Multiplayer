@@ -2,6 +2,7 @@
 using LiteNetLib.Utils;
 using System;
 using System.Collections.Generic;
+using System.Runtime.Remoting.Messaging;
 using System.Threading;
 
 namespace Server {
@@ -39,6 +40,15 @@ namespace Server {
                 Console.WriteLine($"Player {peer.Id} disconnected.");
                 RemovePlayer(peer.Id);
                 BroadcastMessage($"{peer.Id} disconnected from the server.", peer);
+
+                writer.Reset();
+                writer.Put("DestoryDisconnectObject");
+                writer.Put(peer.Id);
+
+                foreach (var p in server.ConnectedPeerList) {
+                    if (p != peer)
+                        p.Send(writer, DeliveryMethod.ReliableOrdered);
+                }
             };
 
             listener.NetworkReceiveEvent += (peer, dataReader, deliveryMethod, channel) => {
