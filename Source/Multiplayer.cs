@@ -12,14 +12,15 @@ namespace Multiplayer {
     [BepInDependency(NineSolsAPICore.PluginGUID)]
     [BepInPlugin("com.example.multiplayer", "Multiplayer Plugin", "1.0.0")]
     public class Multiplayer : BaseUnityPlugin {
+        public static Multiplayer Instance { get; set; }
         private Harmony harmony;
         private NetManager client;
         private NetDataWriter dataWriter;
         private EventBasedNetListener listener;
 
-        private float sendInterval = 0.05f; // 50ms
+        private float sendInterval = 0.2f; // 50ms
         private float sendTimer = 0;
-
+        public string localAnimationState = "";
         // Dictionary to store other players' data
         private Dictionary<int, PlayerData> playerObjects = new Dictionary<int, PlayerData>();
         private int localPlayerId = -1;
@@ -138,11 +139,8 @@ namespace Multiplayer {
 
         private void UpdatePlayerData(int playerId, Vector3 newPosition) {
             if (playerObjects.TryGetValue(playerId, out var playerData)) {
-                playerData.PlayerObject.transform.position = Vector3.Lerp(
-                    playerData.PlayerObject.transform.position,
-                    newPosition,
-                    Time.deltaTime * 10 // Adjust smoothing factor as needed
-                );
+                playerData.PlayerObject.transform.position = newPosition;
+                //playerData.PlayerObject.GetComponent<Animator>().PlayInFixedTime(localAnimationState,0,0f);
             } else {
                 // Instantiate a new player object if not found
                 GameObject playerObject;

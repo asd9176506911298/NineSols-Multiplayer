@@ -20,10 +20,10 @@ public class Patches {
     public static bool Prefix(Animator __instance, string stateName, int layer, float normalizedTime) {
         // Your custom logic before the original method is called
         //Log.Info($"{__instance.name} {stateName} {layer} {normalizedTime}");
-        
-        //if(__instance.name == "SpriteHolder") {
-        //    Multiplayer.Instance.localAnimationState = stateName;
-        //}
+
+        if (__instance.name == "SpriteHolder") {
+            Multiplayer.Instance.localAnimationState = stateName;
+        }
 
         // Return true to allow the original method to execute
         return true;
