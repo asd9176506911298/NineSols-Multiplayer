@@ -1,7 +1,11 @@
 ﻿using LiteNetLib;
 
-public class PlayerData {
-    public int PlayerId;
-    public NetPeer Peer;
-    public float x, y, z;
+class PlayerData {
+    public int PlayerId { get; set; }
+    public NetPeer Peer { get; set; }
+    public float x { get; set; }
+    public float y { get; set; }
+    public float z { get; set; }
+    public string AnimationState { get; set; }
+    public bool isFacingRight { get; set; }
 }

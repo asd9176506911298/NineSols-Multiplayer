@@ -107,11 +107,15 @@ namespace Server {
             float x = dataReader.GetFloat();
             float y = dataReader.GetFloat();
             float z = dataReader.GetFloat();
+            string animState = dataReader.GetString();
+            bool isFacingRight = dataReader.GetBool();
 
             if (players.TryGetValue(playerId, out var player)) {
                 player.x = x;
                 player.y = y;
                 player.z = z;
+                player.AnimationState = animState;
+                player.isFacingRight = isFacingRight;
                 BroadcastPlayerPositions(peer);
                 Console.WriteLine($"Player {playerId} position updated: {x}, {y}, {z}");
             }
@@ -127,18 +131,12 @@ namespace Server {
                         writer.Put(player.x);
                         writer.Put(player.y);
                         writer.Put(player.z);
+                        writer.Put(player.AnimationState);
+                        writer.Put(player.isFacingRight);
                         peer.Send(writer, DeliveryMethod.Unreliable);
                     }
                 }
             }
         }
-    }
-
-    class PlayerData {
-        public int PlayerId { get; set; }
-        public NetPeer Peer { get; set; }
-        public float x { get; set; }
-        public float y { get; set; }
-        public float z { get; set; }
     }
 }

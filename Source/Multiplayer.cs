@@ -18,9 +18,9 @@ namespace Multiplayer {
         private NetDataWriter dataWriter;
         private EventBasedNetListener listener;
 
-        private float sendInterval = 0.2f; // 50ms
+        private float sendInterval = 0.05f; // 50ms
         private float sendTimer = 0;
-        public string localAnimationState = "";
+        public string? localAnimationState;
         // Dictionary to store other players' data
         private Dictionary<int, PlayerData> playerObjects = new Dictionary<int, PlayerData>();
         private int localPlayerId = -1;
@@ -39,6 +39,8 @@ namespace Multiplayer {
             KeybindManager.Add(this, DisconnectFromServer, () => new KeyboardShortcut(KeyCode.C));
             KeybindManager.Add(this, SendPosition, () => new KeyboardShortcut(KeyCode.V));
 
+
+            Instance = this;
             Log.Info("Multiplayer plugin initialized.");
         }
 
@@ -108,6 +110,8 @@ namespace Multiplayer {
             dataWriter.Put(position.x);
             dataWriter.Put(position.y+6.5f);
             dataWriter.Put(position.z);
+            dataWriter.Put(localAnimationState);
+            dataWriter.Put(Player.i.Facing.ToString().Equals("Right") ? true : false);
             client.FirstPeer.Send(dataWriter, DeliveryMethod.Unreliable);
         }
 
@@ -121,10 +125,12 @@ namespace Multiplayer {
                 float x = reader.GetFloat();
                 float y = reader.GetFloat();
                 float z = reader.GetFloat();
+                string animState = reader.GetString();
+                bool isFacingRight = reader.GetBool();
 
                 // Only update other players' positions if we have received our localPlayerId
                 if (localPlayerId != -1 && playerId != localPlayerId) {
-                    UpdatePlayerData(playerId, new Vector3(x, y, z));
+                    UpdatePlayerData(playerId, new Vector3(x, y, z), animState, isFacingRight);
                 }
             } else if (messageType == "localPlayerId") {
                 localPlayerId = reader.GetInt();
@@ -137,10 +143,15 @@ namespace Multiplayer {
         }
 
 
-        private void UpdatePlayerData(int playerId, Vector3 newPosition) {
+        private void UpdatePlayerData(int playerId, Vector3 newPosition, string animationState, bool isFacingRight) {
             if (playerObjects.TryGetValue(playerId, out var playerData)) {
                 playerData.PlayerObject.transform.position = newPosition;
-                //playerData.PlayerObject.GetComponent<Animator>().PlayInFixedTime(localAnimationState,0,0f);
+            
+                playerData.PlayerObject.transform.localScale = new Vector3(Mathf.Abs(transform.localScale.x) * (isFacingRight ? 1 : -1),
+                        transform.localScale.y,
+                        transform.localScale.z
+                    );
+                playerData.PlayerObject.GetComponent<Animator>().PlayInFixedTime(animationState, 0, 0f);
             } else {
                 // Instantiate a new player object if not found
                 GameObject playerObject;
