@@ -49,13 +49,15 @@ namespace Multiplayer {
             DestroyAllPlayerObjects();
 
             listener.NetworkReceiveEvent += (peer, reader, deliveryMethod, channel) => {
-                HandleReceivedData(peer, reader);
-                reader.Recycle();
+                ToastManager.Toast("NetworkReceiveEvent");
+                //HandleReceivedData(peer, reader);
+                //reader.Recycle();
             };
 
             listener.PeerDisconnectedEvent += (peer, disconnectInfo) => {
+                ToastManager.Toast("PeerDisconnectedEvent");
                 // Clear player objects on disconnection
-                DestroyAllPlayerObjects();
+                //DestroyAllPlayerObjects();
             };
         }
 
@@ -190,13 +192,13 @@ namespace Multiplayer {
         }
 
         private void Update() {
-            if (client?.FirstPeer != null && client.FirstPeer.ConnectionState == ConnectionState.Connected) {
-                sendTimer += Time.deltaTime;
-                if (sendTimer >= sendInterval) {
-                    SendPosition();
-                    sendTimer = 0;
-                }
-            }
+            //if (client?.FirstPeer != null && client.FirstPeer.ConnectionState == ConnectionState.Connected) {
+            //    sendTimer += Time.deltaTime;
+            //    if (sendTimer >= sendInterval) {
+            //        SendPosition();
+            //        sendTimer = 0;
+            //    }
+            //}
 
             client?.PollEvents();
         }

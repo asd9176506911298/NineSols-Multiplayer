@@ -30,39 +30,40 @@ namespace Server {
 
             listener.PeerConnectedEvent += peer => {
                 Console.WriteLine($"Player {peer.Id} connected.");
-                AddNewPlayer(peer);  // Add the new player to the server's dictionary
+                //AddNewPlayer(peer);  // Add the new player to the server's dictionary
 
-                // Send the local player's ID to the new player (so they know their own ID)
-                SendLocalPlayerId(peer);
+                //// Send the local player's ID to the new player (so they know their own ID)
+                //SendLocalPlayerId(peer);
 
-                // Broadcast to all other clients that a new player has connected
-                BroadcastNewPlayerToOthers(peer);
+                //// Broadcast to all other clients that a new player has connected
+                //BroadcastNewPlayerToOthers(peer);
             };
 
             listener.PeerDisconnectedEvent += (peer, disconnectInfo) => {
                 Console.WriteLine($"Player {peer.Id} disconnected.");
-                RemovePlayer(peer.Id);
-                BroadcastMessage($"{peer.Id} disconnected from the server.", peer);
+                //RemovePlayer(peer.Id);
+                //BroadcastMessage($"{peer.Id} disconnected from the server.", peer);
 
-                // Notify others about the disconnection
-                writer = new NetDataWriter(); // Use a fresh writer each time
-                writer.Put("DestoryDisconnectObject");
-                writer.Put(peer.Id);
+                //// Notify others about the disconnection
+                //writer = new NetDataWriter(); // Use a fresh writer each time
+                //writer.Put("DestoryDisconnectObject");
+                //writer.Put(peer.Id);
 
-                foreach (var p in server.ConnectedPeerList) {
-                    if (p != peer)
-                        p.Send(writer, DeliveryMethod.Unreliable);
-                }
+                //foreach (var p in server.ConnectedPeerList) {
+                //    if (p != peer)
+                //        p.Send(writer, DeliveryMethod.Unreliable);
+                //}
             };
 
             listener.NetworkReceiveEvent += (peer, dataReader, deliveryMethod, channel) => {
-                string messageType = dataReader.GetString();
-                if (messageType == "Position") {
-                    UpdatePlayerPosition(peer, dataReader);
-                } else {
-                    Console.WriteLine($"Unknown message type: {messageType}");
-                }
-                dataReader.Recycle();
+                Console.WriteLine("NetworkReceiveEvent");
+                //string messageType = dataReader.GetString();
+                //if (messageType == "Position") {
+                //    UpdatePlayerPosition(peer, dataReader);
+                //} else {
+                //    Console.WriteLine($"Unknown message type: {messageType}");
+                //}
+                //dataReader.Recycle();
             };
 
             while (!Console.KeyAvailable) {
