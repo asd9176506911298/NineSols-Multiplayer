@@ -48,20 +48,34 @@ namespace Multiplayer {
             localPlayerId = -1;
             DestroyAllPlayerObjects();
 
-            listener.NetworkReceiveEvent += (peer, reader, deliveryMethod, channel) => {
-                HandleReceivedData(peer, reader);
-                reader.Recycle();
-            };
+            listener.NetworkReceiveEvent += OnNetworkReceiveEvent;
+            listener.PeerDisconnectedEvent += OnPeerDisconnectedEvent;
 
-            listener.PeerDisconnectedEvent += (peer, disconnectInfo) => {
-                // Clear player objects on disconnection
-                DestroyAllPlayerObjects();
-            };
+            //listener.NetworkReceiveEvent += (peer, reader, deliveryMethod, channel) => {
+            //    HandleReceivedData(peer, reader);
+            //    reader.Recycle();
+            //};
+
+            //listener.PeerDisconnectedEvent += (peer, disconnectInfo) => {
+            //    // Clear player objects on disconnection
+            //    DestroyAllPlayerObjects();
+            //};
+        }
+
+        void OnNetworkReceiveEvent(NetPeer peer,NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod) {
+            HandleReceivedData(peer, reader);
+            reader.Recycle();
+        }
+
+        void OnPeerDisconnectedEvent(NetPeer peer,DisconnectInfo disconnectInfo) {
+            DestroyAllPlayerObjects();
         }
 
         private void DisconnectFromServer() {
             localPlayerId = -1;
             client?.DisconnectAll();
+            listener.NetworkReceiveEvent -= OnNetworkReceiveEvent;
+            listener.PeerDisconnectedEvent -= OnPeerDisconnectedEvent;
             DestroyAllPlayerObjects();
 
             ToastManager.Toast("Disconnected from server.");
@@ -157,6 +171,8 @@ namespace Multiplayer {
 
         private void OnDestroy() {
             harmony.UnpatchSelf();
+            listener.NetworkReceiveEvent -= OnNetworkReceiveEvent;
+            listener.PeerDisconnectedEvent -= OnPeerDisconnectedEvent;
             client?.Stop();
         }
 
