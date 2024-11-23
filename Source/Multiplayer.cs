@@ -4,8 +4,8 @@ using HarmonyLib;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using NineSolsAPI;
+using System;
 using System.Collections.Generic;
-using System.Threading;
 using UnityEngine;
 
 namespace Multiplayer {
@@ -76,7 +76,6 @@ namespace Multiplayer {
             playerObjects.Clear();
         }
 
-
         private void SendPosition() {
             if (client.FirstPeer == null) {
                 ToastManager.Toast("Not connected to server.");
@@ -91,7 +90,7 @@ namespace Multiplayer {
             else
                 position = Vector3.zero;
             dataWriter.Put(position.x);
-            dataWriter.Put(position.y+6.5f);
+            dataWriter.Put(position.y + 6.5f); // Adjust Y if necessary
             dataWriter.Put(position.z);
             client.FirstPeer.Send(dataWriter, DeliveryMethod.Unreliable);
         }
@@ -111,16 +110,57 @@ namespace Multiplayer {
                 if (localPlayerId != -1 && playerId != localPlayerId) {
                     UpdatePlayerData(playerId, new Vector3(x, y, z));
                 }
+            } else if (messageType == "NewPlayer") {
+                // Handle the new player joining
+                int newPlayerId = reader.GetInt();
+                float newX = reader.GetFloat();
+                float newY = reader.GetFloat();
+                float newZ = reader.GetFloat();
+                AddNewPlayerObject(newPlayerId, newX, newY, newZ);
             } else if (messageType == "localPlayerId") {
                 localPlayerId = reader.GetInt();
                 ToastManager.Toast($"Local Player ID set to {localPlayerId}");
             } else if (messageType == "DestoryDisconnectObject") {
                 int playerId = reader.GetInt();
-                Destroy(playerObjects[playerId].PlayerObject);
-                playerObjects.Remove(playerId);
+                if (playerObjects.ContainsKey(playerId)) {
+                    Destroy(playerObjects[playerId].PlayerObject);
+                    playerObjects.Remove(playerId);
+                }
             }
         }
 
+        void AddNewPlayerObject(int playerId, float x, float y, float z) {
+            // Check if the player already exists
+            if (!playerObjects.ContainsKey(playerId)) {
+                var newPlayerObject = InstantiatePlayerModel(playerId);  // Instantiate the new player model
+                playerObjects[playerId] = new PlayerData(newPlayerObject, new Vector3(x, y, z));
+                SetPlayerPosition(playerId, x, y, z);  // Set initial position
+                Debug.Log($"New player {playerId} added at position: {x}, {y}, {z}");
+            } else {
+                // If the player already exists, just update the position
+                SetPlayerPosition(playerId, x, y, z);
+            }
+        }
+
+        // Example: Instantiate a new player model (you can customize this)
+        private GameObject InstantiatePlayerModel(int playerId) {
+            GameObject playerPrefab = Resources.Load<GameObject>("PlayerPrefab"); // Ensure you have a prefab
+            if (playerPrefab == null) {
+                Debug.LogError("Player prefab not found!");
+                return new GameObject($"Player{playerId}"); // Fallback if prefab not found
+            }
+            GameObject newPlayerObject = Instantiate(playerPrefab);
+            newPlayerObject.name = $"Player {playerId}";
+            return newPlayerObject;
+        }
+
+        // Set the player's position on the client
+        void SetPlayerPosition(int playerId, float x, float y, float z) {
+            if (playerObjects.ContainsKey(playerId)) {
+                var playerObject = playerObjects[playerId];
+                playerObject.SetPosition(x, y, z);  // Assuming `SetPosition` is a valid method
+            }
+        }
 
         private void UpdatePlayerData(int playerId, Vector3 newPosition) {
             if (playerObjects.TryGetValue(playerId, out var playerData)) {
@@ -140,6 +180,14 @@ namespace Multiplayer {
             }
         }
 
+        void UpdatePlayerPositionOnClient(int playerId, float x, float y, float z) {
+            if (!playerObjects.ContainsKey(playerId)) {
+                // The player object might not exist yet; handle accordingly
+                AddNewPlayerObject(playerId, x, y, z);  // Create the player if necessary
+            } else {
+                SetPlayerPosition(playerId, x, y, z);  // Update position of the existing player object
+            }
+        }
 
         private void Update() {
             if (client?.FirstPeer != null && client.FirstPeer.ConnectionState == ConnectionState.Connected) {
@@ -153,13 +201,23 @@ namespace Multiplayer {
             client?.PollEvents();
         }
 
-
-
         private void OnDestroy() {
             harmony.UnpatchSelf();
             client?.Stop();
         }
+    }
 
+    public class PlayerData {
+        public GameObject PlayerObject;
+        public Vector3 Position;
 
+        public PlayerData(GameObject playerObject, Vector3 position) {
+            PlayerObject = playerObject;
+            Position = position;
+        }
+
+        public void SetPosition(float x, float y, float z) {
+            PlayerObject.transform.position = new Vector3(x, y, z);
+        }
     }
 }

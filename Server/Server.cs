@@ -30,9 +30,13 @@ namespace Server {
 
             listener.PeerConnectedEvent += peer => {
                 Console.WriteLine($"Player {peer.Id} connected.");
-                AddNewPlayer(peer);
+                AddNewPlayer(peer);  // Add the new player to the server's dictionary
+
+                // Send the local player's ID to the new player (so they know their own ID)
                 SendLocalPlayerId(peer);
-                BroadcastMessage($"{peer.Id} connected to the server.", peer);
+
+                // Broadcast to all other clients that a new player has connected
+                BroadcastNewPlayerToOthers(peer);
             };
 
             listener.PeerDisconnectedEvent += (peer, disconnectInfo) => {
@@ -68,6 +72,22 @@ namespace Server {
 
             server.Stop();
             Console.WriteLine("Server stopped.");
+        }
+
+        // Send the new player’s data to all other clients
+        static void BroadcastNewPlayerToOthers(NetPeer newPeer) {
+            writer.Reset();
+            writer.Put("NewPlayer");
+            writer.Put(newPeer.Id);
+            writer.Put(0f); // Initial position x
+            writer.Put(0f); // Initial position y
+            writer.Put(0f); // Initial position z
+
+            foreach (var peer in server.ConnectedPeerList) {
+                if (peer != newPeer) {
+                    peer.Send(writer, DeliveryMethod.ReliableOrdered);
+                }
+            }
         }
 
         static void AddNewPlayer(NetPeer peer) {
@@ -112,26 +132,31 @@ namespace Server {
                 player.x = x;
                 player.y = y;
                 player.z = z;
-                BroadcastPlayerPositions(peer);
+                BroadcastPlayerPositions();
                 Console.WriteLine($"Player {playerId} position updated: {x}, {y}, {z}");
             }
         }
 
-        static void BroadcastPlayerPositions(NetPeer fromPeer) {
+        static void BroadcastPlayerPositions() {
             foreach (var peer in server.ConnectedPeerList) {
-                foreach (var player in players.Values) {
-                    if (player.PlayerId != fromPeer.Id) {
-                        writer = new NetDataWriter(); // Fresh writer instance for each broadcast
-                        writer.Put("Position");
-                        writer.Put(player.PlayerId);
-                        writer.Put(player.x);
-                        writer.Put(player.y);
-                        writer.Put(player.z);
-                        peer.Send(writer, DeliveryMethod.Unreliable);
-                    }
+                writer.Reset();
+                writer.Put("Position");
+                writer.Put(peer.Id);
+
+                // Check if the peer.Id exists in the players dictionary
+                if (players.TryGetValue(peer.Id, out var player)) {
+                    writer.Put(player.x);
+                    writer.Put(player.y);
+                    writer.Put(player.z);
+                    peer.Send(writer, DeliveryMethod.ReliableOrdered);
+                } else {
+                    // Handle the case where the player data does not exist
                 }
             }
         }
+
+
+
     }
 
     class PlayerData {
