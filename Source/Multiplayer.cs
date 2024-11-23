@@ -7,6 +7,7 @@ using NineSolsAPI;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Analytics;
 
 namespace Multiplayer {
     [BepInDependency(NineSolsAPICore.PluginGUID)]
@@ -48,24 +49,36 @@ namespace Multiplayer {
             localPlayerId = -1;
             DestroyAllPlayerObjects();
 
-            listener.NetworkReceiveEvent += (peer, reader, deliveryMethod, channel) => {
-                ToastManager.Toast("NetworkReceiveEvent");
-                //HandleReceivedData(peer, reader);
-                //reader.Recycle();
-            };
 
-            listener.PeerDisconnectedEvent += (peer, disconnectInfo) => {
-                ToastManager.Toast("PeerDisconnectedEvent");
-                // Clear player objects on disconnection
-                //DestroyAllPlayerObjects();
-            };
+            listener.NetworkReceiveEvent += OnNetworkReceive;
+            listener.PeerDisconnectedEvent += PeerDisconnectedEvent;
+            //listener.NetworkReceiveEvent += (peer, reader, deliveryMethod, channel) => {
+            //    ToastManager.Toast("NetworkReceiveEvent");
+            //    //HandleReceivedData(peer, reader);
+            //    //reader.Recycle();
+            //};
+
+            //listener.PeerDisconnectedEvent += (peer, disconnectInfo) => {
+            //    ToastManager.Toast("PeerDisconnectedEvent");
+            //    // Clear player objects on disconnection
+            //    //DestroyAllPlayerObjects();
+            //};
+        }
+
+        void OnNetworkReceive(NetPeer peer, NetDataReader reader, byte channel, DeliveryMethod deliveryMethod) {
+            ToastManager.Toast($"NetworkReceiveEvent peer:{peer} reader:{reader} channel:{channel} deliveryMethod:{deliveryMethod}");
+        }
+
+        void PeerDisconnectedEvent(NetPeer peer, DisconnectInfo disconnectInfo) {
+            ToastManager.Toast($"PeerDisconnectedEvent peer:{peer} disconnectInfo:{disconnectInfo}");
         }
 
         private void DisconnectFromServer() {
             localPlayerId = -1;
             client?.DisconnectAll();
             DestroyAllPlayerObjects();
-
+            listener.NetworkReceiveEvent -= OnNetworkReceive;
+            listener.PeerDisconnectedEvent -= PeerDisconnectedEvent;
             ToastManager.Toast("Disconnected from server.");
         }
 
@@ -205,6 +218,8 @@ namespace Multiplayer {
 
         private void OnDestroy() {
             harmony.UnpatchSelf();
+            listener.NetworkReceiveEvent -= OnNetworkReceive;
+            listener.PeerDisconnectedEvent -= PeerDisconnectedEvent;
             client?.Stop();
         }
     }
