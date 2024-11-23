@@ -1,8 +1,8 @@
 ﻿using LiteNetLib;
 using LiteNetLib.Utils;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Runtime.Remoting.Messaging;
 using System.Threading;
 
 namespace Server {
@@ -10,15 +10,14 @@ namespace Server {
         static NetManager server;
         static NetDataWriter writer;
 
-        // Dictionary to store player data by their ID
-        static Dictionary<int, PlayerData> players = new Dictionary<int, PlayerData>();
+        // Use ConcurrentDictionary for thread-safety
+        static ConcurrentDictionary<int, PlayerData> players = new ConcurrentDictionary<int, PlayerData>();
 
         static void Main(string[] args) {
             Console.WriteLine("Starting Server...");
 
             EventBasedNetListener listener = new EventBasedNetListener();
             server = new NetManager(listener);
-            writer = new NetDataWriter();
 
             server.Start(9050); // Start server on port 9050
 
@@ -41,13 +40,14 @@ namespace Server {
                 RemovePlayer(peer.Id);
                 BroadcastMessage($"{peer.Id} disconnected from the server.", peer);
 
-                writer.Reset();
+                // Notify others about the disconnection
+                writer = new NetDataWriter(); // Use a fresh writer each time
                 writer.Put("DestoryDisconnectObject");
                 writer.Put(peer.Id);
 
                 foreach (var p in server.ConnectedPeerList) {
                     if (p != peer)
-                        p.Send(writer, DeliveryMethod.ReliableOrdered);
+                        p.Send(writer, DeliveryMethod.Unreliable);
                 }
             };
 
@@ -78,26 +78,27 @@ namespace Server {
                 y = 0,
                 z = 0
             };
+            Console.WriteLine($"New player added with PlayerId: {peer.Id}");
         }
 
         static void RemovePlayer(int playerId) {
-            players.Remove(playerId);
+            players.TryRemove(playerId, out _);
         }
 
         static void SendLocalPlayerId(NetPeer peer) {
-            writer.Reset();
+            writer = new NetDataWriter(); // Fresh writer instance for each message
             writer.Put("localPlayerId");
             writer.Put(peer.Id);
-            peer.Send(writer, DeliveryMethod.ReliableOrdered);
+            peer.Send(writer, DeliveryMethod.Unreliable);
         }
 
         static void BroadcastMessage(string message, NetPeer excludePeer) {
-            writer.Reset();
+            writer = new NetDataWriter(); // Fresh writer instance for each broadcast
             writer.Put(message);
 
             foreach (var peer in server.ConnectedPeerList) {
                 if (peer != excludePeer)
-                    peer.Send(writer, DeliveryMethod.ReliableOrdered);
+                    peer.Send(writer, DeliveryMethod.Unreliable);
             }
         }
 
@@ -119,17 +120,25 @@ namespace Server {
         static void BroadcastPlayerPositions(NetPeer fromPeer) {
             foreach (var peer in server.ConnectedPeerList) {
                 foreach (var player in players.Values) {
-                    writer.Reset();
-                    writer.Put("Position");
-                    writer.Put(player.PlayerId);
-                    writer.Put(player.x);
-                    writer.Put(player.y);
-                    writer.Put(player.z);
-                    peer.Send(writer, DeliveryMethod.ReliableOrdered);
+                    if (player.PlayerId != fromPeer.Id) {
+                        writer = new NetDataWriter(); // Fresh writer instance for each broadcast
+                        writer.Put("Position");
+                        writer.Put(player.PlayerId);
+                        writer.Put(player.x);
+                        writer.Put(player.y);
+                        writer.Put(player.z);
+                        peer.Send(writer, DeliveryMethod.Unreliable);
+                    }
                 }
             }
         }
     }
 
-
+    class PlayerData {
+        public int PlayerId { get; set; }
+        public NetPeer Peer { get; set; }
+        public float x { get; set; }
+        public float y { get; set; }
+        public float z { get; set; }
+    }
 }

@@ -17,6 +17,9 @@ namespace Multiplayer {
         private NetDataWriter dataWriter;
         private EventBasedNetListener listener;
 
+        private float sendInterval = 0.05f; // 50ms
+        private float sendTimer = 0;
+
         // Dictionary to store other players' data
         private Dictionary<int, PlayerData> playerObjects = new Dictionary<int, PlayerData>();
         private int localPlayerId = -1;
@@ -42,6 +45,8 @@ namespace Multiplayer {
             ToastManager.Toast("Connecting to server...");
             client.Start();
             client.Connect("localhost", 9050, "SomeConnectionKey");
+            localPlayerId = -1;
+            DestroyAllPlayerObjects();
 
             listener.NetworkReceiveEvent += (peer, reader, deliveryMethod, channel) => {
                 HandleReceivedData(peer, reader);
@@ -55,6 +60,7 @@ namespace Multiplayer {
         }
 
         private void DisconnectFromServer() {
+            localPlayerId = -1;
             client?.DisconnectAll();
             DestroyAllPlayerObjects();
 
@@ -79,11 +85,15 @@ namespace Multiplayer {
 
             dataWriter.Reset();
             dataWriter.Put("Position");
-            Vector3 position = Player.i.transform.position; // Use your player's position
+            Vector3 position;
+            if (Player.i != null)
+                position = Player.i.transform.position; // Use your player's position
+            else
+                position = Vector3.zero;
             dataWriter.Put(position.x);
             dataWriter.Put(position.y+6.5f);
             dataWriter.Put(position.z);
-            client.FirstPeer.Send(dataWriter, DeliveryMethod.ReliableOrdered);
+            client.FirstPeer.Send(dataWriter, DeliveryMethod.Unreliable);
         }
 
         private void HandleReceivedData(NetPeer peer, NetDataReader reader) {
@@ -92,46 +102,57 @@ namespace Multiplayer {
             string messageType = reader.GetString();
 
             if (messageType == "Position") {
-
                 int playerId = reader.GetInt();
                 float x = reader.GetFloat();
                 float y = reader.GetFloat();
                 float z = reader.GetFloat();
 
-                // Only instantiate/update other players' objects
-                if (playerId != localPlayerId) {
+                // Only update other players' positions if we have received our localPlayerId
+                if (localPlayerId != -1 && playerId != localPlayerId) {
                     UpdatePlayerData(playerId, new Vector3(x, y, z));
                 }
             } else if (messageType == "localPlayerId") {
                 localPlayerId = reader.GetInt();
-            } else if(messageType == "DestoryDisconnectObject") {
+                ToastManager.Toast($"Local Player ID set to {localPlayerId}");
+            } else if (messageType == "DestoryDisconnectObject") {
                 int playerId = reader.GetInt();
                 Destroy(playerObjects[playerId].PlayerObject);
                 playerObjects.Remove(playerId);
             }
         }
 
-        private void UpdatePlayerData(int playerId, Vector3 position) {
-            if (!playerObjects.TryGetValue(playerId, out var playerData)) {
-                // Instantiate a new player object for other players
-                GameObject playerObject = Instantiate(Player.i.transform.Find("RotateProxy/SpriteHolder").gameObject, position, Quaternion.identity);
-                playerData = new PlayerData(playerObject, position);
-                playerObjects[playerId] = playerData;
+
+        private void UpdatePlayerData(int playerId, Vector3 newPosition) {
+            if (playerObjects.TryGetValue(playerId, out var playerData)) {
+                playerData.PlayerObject.transform.position = Vector3.Lerp(
+                    playerData.PlayerObject.transform.position,
+                    newPosition,
+                    Time.deltaTime * 10 // Adjust smoothing factor as needed
+                );
             } else {
-                // Update position for existing player object
-                playerData.PlayerObject.transform.position = position;
+                // Instantiate a new player object if not found
+                GameObject playerObject;
+                if (Player.i != null)
+                    playerObject = Instantiate(Player.i.transform.Find("RotateProxy/SpriteHolder").gameObject, newPosition, Quaternion.identity);
+                else
+                    playerObject = new GameObject($"Player{playerId}");
+                playerObjects[playerId] = new PlayerData(playerObject, newPosition);
             }
         }
+
 
         private void Update() {
-            // Check if the client is connected before sending the position
             if (client?.FirstPeer != null && client.FirstPeer.ConnectionState == ConnectionState.Connected) {
-                SendPosition();
+                sendTimer += Time.deltaTime;
+                if (sendTimer >= sendInterval) {
+                    SendPosition();
+                    sendTimer = 0;
+                }
             }
 
-            // Poll network events
             client?.PollEvents();
         }
+
 
 
         private void OnDestroy() {
