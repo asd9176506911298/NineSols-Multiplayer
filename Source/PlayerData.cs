@@ -1,12 +1,11 @@
 ﻿using UnityEngine;
 
 public class PlayerData {
-    public GameObject PlayerObject { get; set; }
-    public Vector3 Position { get; set; }
+    public GameObject PlayerObject;
+    public Vector3 Position;
 
-    // Constructor to initialize player data
-    public PlayerData(GameObject playerObject, Vector3 position) {
-        PlayerObject = playerObject;
-        Position = position;
+    public PlayerData(GameObject obj, Vector3 pos) {
+        PlayerObject = obj;
+        Position = pos;
     }
 }

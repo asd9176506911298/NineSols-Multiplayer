@@ -111,12 +111,12 @@ namespace Server {
                 player.x = x;
                 player.y = y;
                 player.z = z;
-                BroadcastPlayerPositions();
+                BroadcastPlayerPositions(peer);
                 Console.WriteLine($"Player {playerId} position updated: {x}, {y}, {z}");
             }
         }
 
-        static void BroadcastPlayerPositions() {
+        static void BroadcastPlayerPositions(NetPeer fromPeer) {
             foreach (var peer in server.ConnectedPeerList) {
                 foreach (var player in players.Values) {
                     writer.Reset();
@@ -131,9 +131,5 @@ namespace Server {
         }
     }
 
-    internal class PlayerData {
-        public int PlayerId;
-        public NetPeer Peer;
-        public float x, y, z;
-    }
+
 }

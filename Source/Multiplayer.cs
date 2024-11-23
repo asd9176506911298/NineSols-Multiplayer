@@ -49,7 +49,6 @@ namespace Multiplayer {
             };
 
             listener.PeerDisconnectedEvent += (peer, disconnectInfo) => {
-                ToastManager.Toast($"Disconnected: Peer ID: {peer.Id}");
                 // Clear player objects on disconnection
                 DestroyAllPlayerObjects();
             };
@@ -93,6 +92,7 @@ namespace Multiplayer {
             string messageType = reader.GetString();
 
             if (messageType == "Position") {
+
                 int playerId = reader.GetInt();
                 float x = reader.GetFloat();
                 float y = reader.GetFloat();
@@ -139,14 +139,6 @@ namespace Multiplayer {
             client?.Stop();
         }
 
-        private class PlayerData {
-            public GameObject PlayerObject;
-            public Vector3 Position;
 
-            public PlayerData(GameObject obj, Vector3 pos) {
-                PlayerObject = obj;
-                Position = pos;
-            }
-        }
     }
 }
