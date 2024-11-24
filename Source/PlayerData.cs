@@ -5,6 +5,7 @@ public class PlayerData {
     public Vector3 Position { get; set; }
     public string AnimationState { get; set; }
     public bool isFacingRight { get; set; }
+    public int id { get; set; }
 
     public PlayerData(GameObject obj, Vector3 pos) {
         PlayerObject = obj;

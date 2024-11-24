@@ -4,9 +4,11 @@ using HarmonyLib;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using NineSolsAPI;
+using NineSolsAPI.Utils;
 using System.Collections.Generic;
 using System.Threading;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Multiplayer {
     [BepInDependency(NineSolsAPICore.PluginGUID)]
@@ -18,11 +20,11 @@ namespace Multiplayer {
         private NetDataWriter dataWriter;
         private EventBasedNetListener listener;
 
-        private float sendInterval = 0.05f; // 50ms
+        private float sendInterval = 0.2f; // 50ms
         private float sendTimer = 0;
         public string? localAnimationState;
         // Dictionary to store other players' data
-        private Dictionary<int, PlayerData> playerObjects = new Dictionary<int, PlayerData>();
+        public Dictionary<int, PlayerData> playerObjects = new Dictionary<int, PlayerData>();
         private int localPlayerId = -1;
 
         private void Awake() {
@@ -37,11 +39,42 @@ namespace Multiplayer {
 
             KeybindManager.Add(this, ConnectToServer, () => new KeyboardShortcut(KeyCode.S));
             KeybindManager.Add(this, DisconnectFromServer, () => new KeyboardShortcut(KeyCode.C));
-            KeybindManager.Add(this, SendPosition, () => new KeyboardShortcut(KeyCode.V));
+            KeybindManager.Add(this, test, () => new KeyboardShortcut(KeyCode.V));
 
 
             Instance = this;
+            SceneManager.sceneLoaded += OnSceneLoaded;
+
             Log.Info("Multiplayer plugin initialized.");
+        }
+
+        private void OnSceneLoaded(Scene scene, LoadSceneMode mode) {
+            if (client.FirstPeer != null) {
+                DestroyAllPlayerObjects();
+            }
+        }
+
+        public void SendDecreaseHealth(int playerId, float value) {
+            if (client.FirstPeer == null) {
+                ToastManager.Toast("Not connected to server.");
+                return;
+            }
+
+            dataWriter.Reset();
+            dataWriter.Put("DecreaseHealth");
+            dataWriter.Put(playerId);
+            dataWriter.Put(value);
+            client.FirstPeer.Send(dataWriter, DeliveryMethod.Unreliable);
+        }
+
+        void test() {
+            SendDecreaseHealth(0, 50f);
+            //CreatePlayerObject(Player.i.transform.position,1337);
+            return;
+            //ToastManager.Toast(Resources.Load<GameObject>("Global Prefabs/GameCore").GetComponent<GameCore>().player.gameObject);
+            var x = Instantiate(Resources.Load<GameObject>("Global Prefabs/GameCore").GetComponent<GameCore>().transform.Find("RCG LifeCycle"));
+            x.transform.Find("PPlayer").position = Player.i.transform.position;
+            x.transform.Find("PPlayer").position = new Vector3(x.transform.Find("PPlayer").position.x + 20f, x.transform.Find("PPlayer").position.y, x.transform.Find("PPlayer").position.z);
         }
 
         private void ConnectToServer() {
@@ -119,7 +152,7 @@ namespace Multiplayer {
             if (peer.ConnectionState != ConnectionState.Connected) return; // Ensure only active peers are processed
 
             string messageType = reader.GetString();
-
+            
             if (messageType == "Position") {
                 int playerId = reader.GetInt();
                 float x = reader.GetFloat();
@@ -139,6 +172,14 @@ namespace Multiplayer {
                 int playerId = reader.GetInt();
                 Destroy(playerObjects[playerId].PlayerObject);
                 playerObjects.Remove(playerId);
+            }else if (messageType == "DecreaseHealth") {
+                ToastManager.Toast("DecreaseHealth");
+                int playerId = reader.GetInt();
+                float value = reader.GetFloat();
+                if(playerId == localPlayerId) {
+                    Player.i.health.ReceiveDOT_Damage(value);
+                    Player.i.ChangeState(PlayerStateType.Hurt, true);
+                }
             }
         }
 
@@ -151,18 +192,26 @@ namespace Multiplayer {
                         transform.localScale.y,
                         transform.localScale.z
                     );
-                playerData.PlayerObject.GetComponent<Animator>().PlayInFixedTime(animationState, 0, 0f);
+
+                playerData.id = playerId;
+                //playerData.PlayerObject.GetComponent<Animator>().PlayInFixedTime(animationState, 0, 0f);
             } else {
                 // Instantiate a new player object if not found
                 GameObject playerObject;
                 if (Player.i != null)
-                    playerObject = Instantiate(Player.i.transform.Find("RotateProxy/SpriteHolder").gameObject, newPosition, Quaternion.identity);
+                    playerObject = CreatePlayerObject(newPosition, playerId);
                 else
                     playerObject = new GameObject($"Player{playerId}");
                 playerObjects[playerId] = new PlayerData(playerObject, newPosition);
             }
         }
 
+        GameObject CreatePlayerObject(Vector3 pos, int playerid) {
+            var x = Instantiate(Player.i.transform.Find("RotateProxy/SpriteHolder").gameObject, pos, Quaternion.identity);
+            x.transform.Find("Health(Don'tKey)").Find("DamageReceiver").GetComponent<EffectReceiver>().effectType = EffectType.EnemyAttack | EffectType.BreakableBreaker;
+            x.name = $"PlayerObject_{playerid}";
+            return x;
+        }
 
         private void Update() {
             if (client?.FirstPeer != null && client.FirstPeer.ConnectionState == ConnectionState.Connected) {
@@ -172,7 +221,6 @@ namespace Multiplayer {
                     sendTimer = 0;
                 }
             }
-
             client?.PollEvents();
         }
 
@@ -182,6 +230,7 @@ namespace Multiplayer {
             harmony.UnpatchSelf();
             listener.NetworkReceiveEvent -= OnNetworkReceiveEvent;
             listener.PeerDisconnectedEvent -= OnPeerDisconnectedEvent;
+            SceneManager.sceneLoaded -= OnSceneLoaded;
             client?.Stop();
         }
 

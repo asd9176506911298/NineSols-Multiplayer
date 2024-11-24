@@ -55,7 +55,11 @@ namespace Server {
                 string messageType = dataReader.GetString();
                 if (messageType == "Position") {
                     UpdatePlayerPosition(peer, dataReader);
-                } else {
+                } else if(messageType == "DecreaseHealth") {
+                    Console.WriteLine("DecreaseHealth");
+                    DecreaseHealth(peer, dataReader);
+                }
+                else {
                     Console.WriteLine($"Unknown message type: {messageType}");
                 }
                 dataReader.Recycle();
@@ -68,6 +72,21 @@ namespace Server {
 
             server.Stop();
             Console.WriteLine("Server stopped.");
+        }
+
+        static void DecreaseHealth(NetPeer peer, NetDataReader dataReader) {
+            int playerid = dataReader.GetInt();
+            float value = dataReader.GetFloat();
+            Console.WriteLine($"DecreaseHealth {playerid} {value}");
+            if (players.ContainsKey(playerid)) {
+                foreach (var p in server.ConnectedPeerList) {
+                    writer = new NetDataWriter(); // Fresh writer instance for each message
+                    writer.Put("DecreaseHealth");
+                    writer.Put(playerid);
+                    writer.Put(value);
+                    p.Send(writer, DeliveryMethod.Unreliable);
+                }
+            }
         }
 
         static void AddNewPlayer(NetPeer peer) {
@@ -117,7 +136,7 @@ namespace Server {
                 player.AnimationState = animState;
                 player.isFacingRight = isFacingRight;
                 BroadcastPlayerPositions(peer);
-                Console.WriteLine($"Player {playerId} position updated: {x}, {y}, {z}");
+                //Console.WriteLine($"Player {playerId} position updated: {x}, {y}, {z}");
             }
         }
 
