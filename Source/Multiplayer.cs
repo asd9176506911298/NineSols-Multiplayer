@@ -194,7 +194,7 @@ namespace Multiplayer {
                     );
 
                 playerData.id = playerId;
-                //playerData.PlayerObject.GetComponent<Animator>().PlayInFixedTime(animationState, 0, 0f);
+                playerData.PlayerObject.GetComponent<Animator>().PlayInFixedTime(animationState, 0, 0f);
             } else {
                 // Instantiate a new player object if not found
                 GameObject playerObject;
@@ -208,7 +208,7 @@ namespace Multiplayer {
 
         GameObject CreatePlayerObject(Vector3 pos, int playerid) {
             var x = Instantiate(Player.i.transform.Find("RotateProxy/SpriteHolder").gameObject, pos, Quaternion.identity);
-            x.transform.Find("Health(Don'tKey)").Find("DamageReceiver").GetComponent<EffectReceiver>().effectType = EffectType.EnemyAttack | EffectType.BreakableBreaker;
+            x.transform.Find("Health(Don'tKey)").Find("DamageReceiver").GetComponent<EffectReceiver>().effectType = EffectType.EnemyAttack | EffectType.BreakableBreaker | EffectType.ShieldBreak | EffectType.PostureDecreaseEffect;
             x.name = $"PlayerObject_{playerid}";
             return x;
         }
@@ -217,7 +217,6 @@ namespace Multiplayer {
             if (client?.FirstPeer != null && client.FirstPeer.ConnectionState == ConnectionState.Connected) {
                 sendTimer += Time.deltaTime;
                 if (sendTimer >= sendInterval) {
-                    SendPosition();
                     sendTimer = 0;
                 }
             }
