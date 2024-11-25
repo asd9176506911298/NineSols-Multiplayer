@@ -166,6 +166,7 @@ namespace Multiplayer {
 
             if (!_playerObjects.TryGetValue(playerId, out var playerData)) {
                 playerData = CreatePlayerObject(playerId, position);
+                ToastManager.Toast(playerData.id);
                 _playerObjects[playerId] = playerData;
             }
 
@@ -192,8 +193,9 @@ namespace Multiplayer {
 
         private PlayerData CreatePlayerObject(int playerId, Vector3 position) {
             var playerObject = Instantiate(Player.i.transform.Find("RotateProxy/SpriteHolder").gameObject, position, Quaternion.identity);
-            playerObject.name = $"Player_{playerId}";
-            return new PlayerData(playerObject, position);
+            playerObject.transform.Find("Health(Don'tKey)").Find("DamageReceiver").GetComponent<EffectReceiver>().effectType = EffectType.EnemyAttack | EffectType.BreakableBreaker | EffectType.ShieldBreak | EffectType.PostureDecreaseEffect;
+            playerObject.name = $"PlayerObject_{playerId}";
+            return new PlayerData(playerObject, position,playerId);
         }
 
         private void UpdatePlayerObject(PlayerData playerData, Vector3 position, string animationState, bool isFacingRight) {
