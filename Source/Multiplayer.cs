@@ -4,7 +4,9 @@ using HarmonyLib;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using NineSolsAPI;
+using NineSolsAPI.Menu;
 using NineSolsAPI.Utils;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -20,6 +22,8 @@ namespace Multiplayer {
         private NetDataWriter _dataWriter;
         private EventBasedNetListener _listener;
 
+        private TitlescreenModifications titlescreenModifications = new();
+
         public readonly Dictionary<int, PlayerData> _playerObjects = new();
         private int _localPlayerId = -1;
         private const float SendInterval = 0.02f;
@@ -31,15 +35,22 @@ namespace Multiplayer {
         private void Awake() {
             Instance = this;
             Log.Init(Logger);
-            RCGLifeCycle.DontDestroyForever(gameObject);
+            try {
+                RCGLifeCycle.DontDestroyForever(gameObject);
 
-            _harmony = Harmony.CreateAndPatchAll(typeof(Multiplayer).Assembly);
-            InitializeNetworking();
+                _harmony = Harmony.CreateAndPatchAll(typeof(Multiplayer).Assembly);
+                InitializeNetworking();
 
-            KeybindManager.Add(this, ConnectToServer, () => new KeyboardShortcut(KeyCode.S));
-            KeybindManager.Add(this, DisconnectFromServer, () => new KeyboardShortcut(KeyCode.C));
+                titlescreenModifications.Load();
 
-            SceneManager.sceneLoaded += OnSceneLoaded;
+                KeybindManager.Add(this, ConnectToServer, () => new KeyboardShortcut(KeyCode.S));
+                KeybindManager.Add(this, DisconnectFromServer, () => new KeyboardShortcut(KeyCode.C));
+
+                SceneManager.sceneLoaded += OnSceneLoaded;
+            } catch (Exception e) {
+                Log.Error($"Failed to initialized modding API: {e}");
+            }
+
             Log.Info("Multiplayer plugin initialized.");
         }
 
@@ -56,6 +67,8 @@ namespace Multiplayer {
             if (_client.FirstPeer != null) {
                 ClearPlayerObjects();
             }
+
+            titlescreenModifications.MaybeExtendMainMenu(scene);
         }
 
         private void ConnectToServer() {
@@ -226,6 +239,7 @@ namespace Multiplayer {
         private void OnDestroy() {
             _harmony.UnpatchSelf();
             SceneManager.sceneLoaded -= OnSceneLoaded;
+            titlescreenModifications.Unload();
             DisconnectFromServer();
         }
     }

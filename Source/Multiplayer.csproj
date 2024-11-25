@@ -34,6 +34,18 @@
         <Reference Include="InControl">
             <HintPath>$(NineSolsPath)/NineSols_Data/Managed/InControl.dll</HintPath>
         </Reference>
+      <Reference Include="I2">
+        <HintPath>$(NineSolsPath)/NineSols_Data/Managed/I2.dll</HintPath>
+      </Reference>
+      <Reference Include="UnityEngine.UI">
+        <HintPath>$(NineSolsPath)/NineSols_Data/Managed/UnityEngine.UI.dll</HintPath>
+      </Reference>
+      <Reference Include="Unity.TextMeshPro">
+        <HintPath>$(NineSolsPath)/NineSols_Data/Managed/Unity.TextMeshPro.dll</HintPath>
+      </Reference>
+      <Reference Include="barbaro.autoattributes.Runtime.dll">
+        <HintPath>$(NineSolsPath)/NineSols_Data/Managed/barbaro.autoattributes.Runtime.dll</HintPath>
+      </Reference>
         <Reference Include="LiteNetLib">
           <HintPath>lib\LiteNetLib.dll</HintPath>
         </Reference>
