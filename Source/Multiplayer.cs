@@ -22,12 +22,11 @@ namespace Multiplayer {
 
         public readonly Dictionary<int, PlayerData> _playerObjects = new();
         private int _localPlayerId = -1;
+        private const float SendInterval = 0.02f;
+        private float _sendTimer;
 
         private string? currentAnimationState = string.Empty;
         public string? localAnimationState = "";
-
-        private const float SendInterval = 0.02f;
-        private float _sendTimer;
 
         private void Awake() {
             Instance = this;
@@ -35,14 +34,12 @@ namespace Multiplayer {
             RCGLifeCycle.DontDestroyForever(gameObject);
 
             _harmony = Harmony.CreateAndPatchAll(typeof(Multiplayer).Assembly);
-
             InitializeNetworking();
 
             KeybindManager.Add(this, ConnectToServer, () => new KeyboardShortcut(KeyCode.S));
             KeybindManager.Add(this, DisconnectFromServer, () => new KeyboardShortcut(KeyCode.C));
 
             SceneManager.sceneLoaded += OnSceneLoaded;
-
             Log.Info("Multiplayer plugin initialized.");
         }
 
@@ -68,7 +65,6 @@ namespace Multiplayer {
             _client.Start();
             _client.Connect("localhost", 9050, "SomeConnectionKey");
             _localPlayerId = -1;
-
             ClearPlayerObjects();
         }
 
@@ -78,7 +74,6 @@ namespace Multiplayer {
             _client.DisconnectAll();
             _client.Stop();
             _localPlayerId = -1;
-
             ClearPlayerObjects();
             ToastManager.Toast("Disconnected from server.");
         }
@@ -164,17 +159,17 @@ namespace Multiplayer {
         private void HandlePositionMessage(NetDataReader reader) {
             var playerId = reader.GetInt();
             var position = new Vector3(reader.GetFloat(), reader.GetFloat(), reader.GetFloat());
-            var AnimationState = reader.GetString();
+            var animationState = reader.GetString();
             var isFacingRight = reader.GetBool();
 
-            if (_localPlayerId == playerId) return; // Skip updating local player data
+            if (_localPlayerId == playerId) return;
 
             if (!_playerObjects.TryGetValue(playerId, out var playerData)) {
                 playerData = CreatePlayerObject(playerId, position);
                 _playerObjects[playerId] = playerData;
             }
 
-            UpdatePlayerObject(playerData, position, AnimationState, isFacingRight);
+            UpdatePlayerObject(playerData, position, animationState, isFacingRight);
         }
 
         private void HandleDecreaseHealth(NetDataReader reader) {
@@ -201,31 +196,24 @@ namespace Multiplayer {
             return new PlayerData(playerObject, position);
         }
 
-        private void UpdatePlayerObject(PlayerData playerData, Vector3 position,string animationState, bool isFacingRight) {
+        private void UpdatePlayerObject(PlayerData playerData, Vector3 position, string animationState, bool isFacingRight) {
             var playerObject = playerData.PlayerObject;
-
             playerObject.transform.position = Vector3.Lerp(playerObject.transform.position, position, Time.deltaTime * 100f);
 
-            Animator animator = playerData.PlayerObject.GetComponent<Animator>();
+            var animator = playerObject.GetComponent<Animator>();
             if (animator == null) {
-                Debug.LogError("Animator not found on player object!");
+                Log.Error("Animator not found on player object!");
                 return;
             }
 
-            // Check if the animation state is different from the current one
             if (animationState != currentAnimationState) {
                 currentAnimationState = animationState;
-
-                // Use CrossFade for smooth transition to the new animation
-                animator.CrossFade(animationState, 0.1f, 0, 0f);  // Smooth transition to the new animation
+                animator.CrossFade(animationState, 0.1f);
             }
 
-            // Check if the animation is currently playing and handle looping
-            if (animator.GetCurrentAnimatorStateInfo(0).IsName(animationState)) {
-                if (animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1f) {
-                    // Ensure full playback for looping (Reset normalizedTime if loop is enabled)
-                    animator.Play(animationState, 0, 0f);  // Ensures animation loops fully
-                }
+            if (animator.GetCurrentAnimatorStateInfo(0).IsName(animationState) &&
+                animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1f) {
+                animator.Play(animationState, 0, 0f);
             }
 
             var scale = playerObject.transform.localScale;

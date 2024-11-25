@@ -148,14 +148,14 @@ namespace Server {
             var y = reader.GetFloat();
             var z = reader.GetFloat();
             var animationState = reader.GetString();
-            var isFacingRight = reader.GetBool();
+            var _isFacingRight = reader.GetBool();
 
             if (_players.TryGetValue(playerId, out var player)) {
                 player.x = x;
                 player.y = y;
                 player.z = z;
                 player.AnimationState = animationState;
-                player.IsFacingRight = isFacingRight;
+                player.isFacingRight = _isFacingRight;
 
                 BroadcastPlayerPositions(peer);
             }
@@ -173,20 +173,10 @@ namespace Server {
                     _writer.Put(player.y);
                     _writer.Put(player.z);
                     _writer.Put(player.AnimationState);
-                    _writer.Put(player.IsFacingRight);
+                    _writer.Put(player.isFacingRight);
                     peer.Send(_writer, DeliveryMethod.Unreliable);
                 }
             }
         }
-    }
-
-    internal class PlayerData {
-        public int PlayerId { get; set; }
-        public NetPeer Peer { get; set; }
-        public float x { get; set; }
-        public float y { get; set; }
-        public float z { get; set; }
-        public string AnimationState { get; set; }
-        public bool IsFacingRight { get; set; }
     }
 }

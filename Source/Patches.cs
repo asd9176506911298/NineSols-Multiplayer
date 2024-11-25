@@ -1,49 +1,32 @@
 ﻿using HarmonyLib;
 using NineSolsAPI;
-using System;
 using UnityEngine;
 
-namespace Multiplayer;
-
-[HarmonyPatch]
-public class Patches {
-    //[HarmonyPatch(typeof(Player), nameof(Player.SetStoryWalk))]
-    //[HarmonyPrefix]
-    //private static bool PatchStoryWalk(ref float walkModifier) {
-    //    walkModifier = 1.0f;
-
-    //    return true; // the original method should be executed
-    //}
-
-    [HarmonyPatch(typeof(Animator), "Play", new[] { typeof(string), typeof(int), typeof(float) })]
-    [HarmonyPrefix]
-    public static bool Prefix(Animator __instance, string stateName, int layer, float normalizedTime) {
-        // Your custom logic before the original method is called
-        //Log.Info($"{__instance.name} {stateName} {layer} {normalizedTime}");
-
-        if (__instance.name == "SpriteHolder") {
-            if (Multiplayer.Instance.localAnimationState != stateName) {
+namespace Multiplayer {
+    [HarmonyPatch]
+    public class Patches {
+        [HarmonyPatch(typeof(Animator), "Play", new[] { typeof(string), typeof(int), typeof(float) })]
+        [HarmonyPrefix]
+        public static bool Prefix(Animator __instance, string stateName, int layer, float normalizedTime) {
+            if (__instance.name == "SpriteHolder" && Multiplayer.Instance.localAnimationState != stateName) {
                 Multiplayer.Instance.localAnimationState = stateName;
             }
+
+            return true; // Allow the original method to execute
         }
 
-        // Return true to allow the original method to execute
-        return true;
-    }
-
-    [HarmonyPatch(typeof(EffectReceiver), "OnHitEnter")]
-    [HarmonyPrefix]
-    public static bool OnHitEnter(EffectReceiver __instance, EffectHitData data) {
-
-
-        if (__instance.transform.parent.parent.name.StartsWith("PlayerObject_")) {
-            foreach (var x in Multiplayer.Instance._playerObjects.Values) {
-                if (x.PlayerObject == __instance.transform.parent.parent.gameObject)
-                    Multiplayer.Instance.SendDecreaseHealth(x.id, data.dealer.FinalValue);
+        [HarmonyPatch(typeof(EffectReceiver), "OnHitEnter")]
+        [HarmonyPrefix]
+        public static bool OnHitEnter(EffectReceiver __instance, EffectHitData data) {
+            if (__instance.transform.parent.parent.name.StartsWith("PlayerObject_")) {
+                foreach (var playerData in Multiplayer.Instance._playerObjects.Values) {
+                    if (playerData.PlayerObject == __instance.transform.parent.parent.gameObject) {
+                        Multiplayer.Instance.SendDecreaseHealth(playerData.id, data.dealer.FinalValue);
+                    }
+                }
             }
-        }
-        // Return true to allow the original method to execute
-        return true;
-    }
 
+            return true; // Allow the original method to execute
+        }
+    }
 }
