@@ -22,7 +22,10 @@ public class Patches {
         //Log.Info($"{__instance.name} {stateName} {layer} {normalizedTime}");
 
         if (__instance.name == "SpriteHolder") {
-            Multiplayer.Instance.localAnimationState = stateName;
+            if (Multiplayer.Instance.localAnimationState != stateName) {
+                Multiplayer.Instance.localAnimationState = stateName;
+                ToastManager.Toast(stateName);
+            }
         }
 
         // Return true to allow the original method to execute

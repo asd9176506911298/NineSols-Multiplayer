@@ -20,7 +20,7 @@ namespace Multiplayer {
         private NetDataWriter dataWriter;
         private EventBasedNetListener listener;
 
-        private float sendInterval = 0.2f; // 50ms
+        private float sendInterval = 0.05f; // 50ms
         private float sendTimer = 0;
         public string? localAnimationState;
         // Dictionary to store other players' data
@@ -136,8 +136,9 @@ namespace Multiplayer {
             dataWriter.Reset();
             dataWriter.Put("Position");
             Vector3 position;
-            if (Player.i != null)
+            if (Player.i != null) {
                 position = Player.i.transform.position; // Use your player's position
+            }
             else
                 position = Vector3.zero;
             dataWriter.Put(position.x);
@@ -145,6 +146,7 @@ namespace Multiplayer {
             dataWriter.Put(position.z);
             dataWriter.Put(localAnimationState);
             dataWriter.Put(Player.i.Facing.ToString().Equals("Right") ? true : false);
+            
             client.FirstPeer.Send(dataWriter, DeliveryMethod.Unreliable);
         }
 
@@ -183,18 +185,46 @@ namespace Multiplayer {
             }
         }
 
+        private string currentAnimationState = string.Empty;  // Variable to store the current animation state
 
         private void UpdatePlayerData(int playerId, Vector3 newPosition, string animationState, bool isFacingRight) {
             if (playerObjects.TryGetValue(playerId, out var playerData)) {
-                playerData.PlayerObject.transform.position = newPosition;
-            
-                playerData.PlayerObject.transform.localScale = new Vector3(Mathf.Abs(transform.localScale.x) * (isFacingRight ? 1 : -1),
-                        transform.localScale.y,
-                        transform.localScale.z
-                    );
+                // Smooth position interpolation
+                playerData.PlayerObject.transform.position = Vector3.Lerp(
+                    playerData.PlayerObject.transform.position,
+                    newPosition,
+                    Time.deltaTime * 50f // Adjust the speed of interpolation
+                );
 
-                playerData.id = playerId;
-                playerData.PlayerObject.GetComponent<Animator>().PlayInFixedTime(animationState, 0, 0f);
+                // Correct the scaling for flipping the player
+                playerData.PlayerObject.transform.localScale = new Vector3(
+                    Mathf.Abs(playerData.PlayerObject.transform.localScale.x) * (isFacingRight ? 1 : -1),
+                    playerData.PlayerObject.transform.localScale.y,
+                    playerData.PlayerObject.transform.localScale.z
+                );
+
+                // Ensure animator component is valid
+                Animator animator = playerData.PlayerObject.GetComponent<Animator>();
+                if (animator == null) {
+                    Debug.LogError("Animator not found on player object!");
+                    return;
+                }
+
+                // Check if the animation state is different from the current one
+                if (animationState != currentAnimationState) {
+                    currentAnimationState = animationState;
+
+                    // Use CrossFade for smooth transition to the new animation
+                    animator.CrossFade(animationState, 0.1f, 0, 0f);  // Smooth transition to the new animation
+                }
+
+                // Check if the animation is currently playing and handle looping
+                if (animator.GetCurrentAnimatorStateInfo(0).IsName(animationState)) {
+                    if (animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1f) {
+                        // Ensure full playback for looping (Reset normalizedTime if loop is enabled)
+                        animator.Play(animationState, 0, 0f);  // Ensures animation loops fully
+                    }
+                }
             } else {
                 // Instantiate a new player object if not found
                 GameObject playerObject;
@@ -202,9 +232,16 @@ namespace Multiplayer {
                     playerObject = CreatePlayerObject(newPosition, playerId);
                 else
                     playerObject = new GameObject($"Player{playerId}");
+
                 playerObjects[playerId] = new PlayerData(playerObject, newPosition);
             }
         }
+
+
+
+
+
+
 
         GameObject CreatePlayerObject(Vector3 pos, int playerid) {
             var x = Instantiate(Player.i.transform.Find("RotateProxy/SpriteHolder").gameObject, pos, Quaternion.identity);
