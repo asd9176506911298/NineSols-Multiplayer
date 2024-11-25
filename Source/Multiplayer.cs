@@ -217,6 +217,7 @@ namespace Multiplayer {
             if (client?.FirstPeer != null && client.FirstPeer.ConnectionState == ConnectionState.Connected) {
                 sendTimer += Time.deltaTime;
                 if (sendTimer >= sendInterval) {
+                    SendPosition();
                     sendTimer = 0;
                 }
             }
@@ -230,6 +231,7 @@ namespace Multiplayer {
             listener.NetworkReceiveEvent -= OnNetworkReceiveEvent;
             listener.PeerDisconnectedEvent -= OnPeerDisconnectedEvent;
             SceneManager.sceneLoaded -= OnSceneLoaded;
+            DisconnectFromServer();
             client?.Stop();
         }
 
