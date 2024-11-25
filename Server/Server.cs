@@ -9,7 +9,7 @@ namespace Server {
     internal class Server {
         private static NetManager _server;
         private static NetDataWriter _writer;
-        private static readonly ConcurrentDictionary<int, PlayerData> _players = new ConcurrentDictionary<int, PlayerData>();
+        private static readonly ConcurrentDictionary<int, PlayerData> _players = new ();
 
         private const int Port = 9050;
         private const string ConnectionKey = "SomeConnectionKey";
