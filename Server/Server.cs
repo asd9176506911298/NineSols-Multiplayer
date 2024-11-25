@@ -7,155 +7,186 @@ using System.Threading;
 
 namespace Server {
     internal class Server {
-        static NetManager server;
-        static NetDataWriter writer;
+        private static NetManager _server;
+        private static NetDataWriter _writer;
+        private static readonly ConcurrentDictionary<int, PlayerData> _players = new ConcurrentDictionary<int, PlayerData>();
 
-        // Use ConcurrentDictionary for thread-safety
-        static ConcurrentDictionary<int, PlayerData> players = new ConcurrentDictionary<int, PlayerData>();
+        private const int Port = 9050;
+        private const string ConnectionKey = "SomeConnectionKey";
+        private const int MaxConnections = 10;
 
         static void Main(string[] args) {
             Console.WriteLine("Starting Server...");
 
-            EventBasedNetListener listener = new EventBasedNetListener();
-            server = new NetManager(listener);
+            var listener = new EventBasedNetListener();
+            _server = new NetManager(listener);
 
-            server.Start(9050); // Start server on port 9050
+            _server.Start(Port);
 
             listener.ConnectionRequestEvent += request => {
-                if (server.ConnectedPeersCount < 10) // Max connections
-                    request.AcceptIfKey("SomeConnectionKey");
+                if (_server.ConnectedPeersCount < MaxConnections)
+                    request.AcceptIfKey(ConnectionKey);
                 else
                     request.Reject();
             };
 
-            listener.PeerConnectedEvent += peer => {
-                Console.WriteLine($"Player {peer.Id} connected.");
-                AddNewPlayer(peer);
-                SendLocalPlayerId(peer);
-                BroadcastMessage($"{peer.Id} connected to the server.", peer);
-            };
+            listener.PeerConnectedEvent += peer => HandlePeerConnected(peer);
+            listener.PeerDisconnectedEvent += (peer, disconnectInfo) => HandlePeerDisconnected(peer);
+            listener.NetworkReceiveEvent += (peer, reader, deliveryMethod, channel) => HandleNetworkReceive(peer, reader);
 
-            listener.PeerDisconnectedEvent += (peer, disconnectInfo) => {
-                Console.WriteLine($"Player {peer.Id} disconnected.");
-                RemovePlayer(peer.Id);
-                BroadcastMessage($"{peer.Id} disconnected from the server.", peer);
+            RunServerLoop();
+        }
 
-                // Notify others about the disconnection
-                writer = new NetDataWriter(); // Use a fresh writer each time
-                writer.Put("DestoryDisconnectObject");
-                writer.Put(peer.Id);
-
-                foreach (var p in server.ConnectedPeerList) {
-                    if (p != peer)
-                        p.Send(writer, DeliveryMethod.Unreliable);
-                }
-            };
-
-            listener.NetworkReceiveEvent += (peer, dataReader, deliveryMethod, channel) => {
-                string messageType = dataReader.GetString();
-                if (messageType == "Position") {
-                    UpdatePlayerPosition(peer, dataReader);
-                } else if(messageType == "DecreaseHealth") {
-                    Console.WriteLine("DecreaseHealth");
-                    DecreaseHealth(peer, dataReader);
-                }
-                else {
-                    Console.WriteLine($"Unknown message type: {messageType}");
-                }
-                dataReader.Recycle();
-            };
-
+        private static void RunServerLoop() {
             while (!Console.KeyAvailable) {
-                server.PollEvents();
+                _server.PollEvents();
                 Thread.Sleep(15); // Reduce CPU usage
             }
 
-            server.Stop();
+            _server.Stop();
             Console.WriteLine("Server stopped.");
         }
 
-        static void DecreaseHealth(NetPeer peer, NetDataReader dataReader) {
-            int playerid = dataReader.GetInt();
-            float value = dataReader.GetFloat();
-            Console.WriteLine($"DecreaseHealth {playerid} {value}");
-            if (players.ContainsKey(playerid)) {
-                foreach (var p in server.ConnectedPeerList) {
-                    writer = new NetDataWriter(); // Fresh writer instance for each message
-                    writer.Put("DecreaseHealth");
-                    writer.Put(playerid);
-                    writer.Put(value);
-                    p.Send(writer, DeliveryMethod.Unreliable);
+        private static void HandlePeerConnected(NetPeer peer) {
+            Console.WriteLine($"Player {peer.Id} connected.");
+            AddNewPlayer(peer);
+            SendLocalPlayerId(peer);
+            BroadcastSystemMessage($"{peer.Id} connected to the server.", peer);
+        }
+
+        private static void HandlePeerDisconnected(NetPeer peer) {
+            Console.WriteLine($"Player {peer.Id} disconnected.");
+            RemovePlayer(peer.Id);
+            BroadcastSystemMessage($"{peer.Id} disconnected from the server.", peer);
+
+            NotifyPlayersAboutDisconnection(peer.Id);
+        }
+
+        private static void NotifyPlayersAboutDisconnection(int playerId) {
+            _writer = new NetDataWriter();
+            _writer.Put("DestroyDisconnectObject");
+            _writer.Put(playerId);
+
+            foreach (var peer in _server.ConnectedPeerList) {
+                peer.Send(_writer, DeliveryMethod.Unreliable);
+            }
+        }
+
+        private static void HandleNetworkReceive(NetPeer peer, NetPacketReader reader) {
+            var messageType = reader.GetString();
+            switch (messageType) {
+                case "Position":
+                    UpdatePlayerPosition(peer, reader);
+                    break;
+                case "DecreaseHealth":
+                    HandleDecreaseHealth(peer, reader);
+                    break;
+                default:
+                    Console.WriteLine($"Unknown message type: {messageType}");
+                    break;
+            }
+            reader.Recycle();
+        }
+
+        private static void HandleDecreaseHealth(NetPeer peer, NetPacketReader reader) {
+            var playerId = reader.GetInt();
+            var damageValue = reader.GetFloat();
+
+            Console.WriteLine($"DecreaseHealth - Player: {playerId}, Damage: {damageValue}");
+
+            if (_players.ContainsKey(playerId)) {
+                BroadcastHealthUpdate(playerId, damageValue);
+            }
+        }
+
+        private static void BroadcastHealthUpdate(int playerId, float damageValue) {
+            _writer = new NetDataWriter();
+            _writer.Put("DecreaseHealth");
+            _writer.Put(playerId);
+            _writer.Put(damageValue);
+
+            foreach (var peer in _server.ConnectedPeerList) {
+                peer.Send(_writer, DeliveryMethod.Unreliable);
+            }
+        }
+
+        private static void AddNewPlayer(NetPeer peer) {
+            var newPlayer = new PlayerData {
+                PlayerId = peer.Id,
+                Peer = peer
+            };
+
+            _players[peer.Id] = newPlayer;
+            Console.WriteLine($"Added new player: {peer.Id}");
+        }
+
+        private static void RemovePlayer(int playerId) {
+            _players.TryRemove(playerId, out _);
+        }
+
+        private static void SendLocalPlayerId(NetPeer peer) {
+            _writer = new NetDataWriter();
+            _writer.Put("localPlayerId");
+            _writer.Put(peer.Id);
+            peer.Send(_writer, DeliveryMethod.Unreliable);
+        }
+
+        private static void BroadcastSystemMessage(string message, NetPeer excludePeer) {
+            _writer = new NetDataWriter();
+            _writer.Put(message);
+
+            foreach (var peer in _server.ConnectedPeerList) {
+                if (peer != excludePeer) {
+                    peer.Send(_writer, DeliveryMethod.Unreliable);
                 }
             }
         }
 
-        static void AddNewPlayer(NetPeer peer) {
-            players[peer.Id] = new PlayerData {
-                PlayerId = peer.Id,
-                Peer = peer,
-                x = 0,
-                y = 0,
-                z = 0
-            };
-            Console.WriteLine($"New player added with PlayerId: {peer.Id}");
-        }
+        private static void UpdatePlayerPosition(NetPeer peer, NetPacketReader reader) {
+            var playerId = peer.Id;
+            var x = reader.GetFloat();
+            var y = reader.GetFloat();
+            var z = reader.GetFloat();
+            var animationState = reader.GetString();
+            var isFacingRight = reader.GetBool();
 
-        static void RemovePlayer(int playerId) {
-            players.TryRemove(playerId, out _);
-        }
-
-        static void SendLocalPlayerId(NetPeer peer) {
-            writer = new NetDataWriter(); // Fresh writer instance for each message
-            writer.Put("localPlayerId");
-            writer.Put(peer.Id);
-            peer.Send(writer, DeliveryMethod.Unreliable);
-        }
-
-        static void BroadcastMessage(string message, NetPeer excludePeer) {
-            writer = new NetDataWriter(); // Fresh writer instance for each broadcast
-            writer.Put(message);
-
-            foreach (var peer in server.ConnectedPeerList) {
-                if (peer != excludePeer)
-                    peer.Send(writer, DeliveryMethod.Unreliable);
-            }
-        }
-
-        static void UpdatePlayerPosition(NetPeer peer, NetDataReader dataReader) {
-            int playerId = peer.Id;
-            float x = dataReader.GetFloat();
-            float y = dataReader.GetFloat();
-            float z = dataReader.GetFloat();
-            string animState = dataReader.GetString();
-            bool isFacingRight = dataReader.GetBool();
-
-            if (players.TryGetValue(playerId, out var player)) {
+            if (_players.TryGetValue(playerId, out var player)) {
                 player.x = x;
                 player.y = y;
                 player.z = z;
-                player.AnimationState = animState;
-                player.isFacingRight = isFacingRight;
+                player.AnimationState = animationState;
+                player.IsFacingRight = isFacingRight;
+
                 BroadcastPlayerPositions(peer);
-                //Console.WriteLine($"Player {playerId} position updated: {x}, {y}, {z}");
             }
         }
 
-        static void BroadcastPlayerPositions(NetPeer fromPeer) {
-            foreach (var peer in server.ConnectedPeerList) {
-                foreach (var player in players.Values) {
-                    if (player.PlayerId != fromPeer.Id) {
-                        writer = new NetDataWriter(); // Fresh writer instance for each broadcast
-                        writer.Put("Position");
-                        writer.Put(player.PlayerId);
-                        writer.Put(player.x);
-                        writer.Put(player.y);
-                        writer.Put(player.z);
-                        writer.Put(player.AnimationState);
-                        writer.Put(player.isFacingRight);
-                        peer.Send(writer, DeliveryMethod.Unreliable);
-                    }
+        private static void BroadcastPlayerPositions(NetPeer excludePeer) {
+            foreach (var peer in _server.ConnectedPeerList) {
+                if (peer == excludePeer) continue;
+
+                foreach (var player in _players.Values) {
+                    _writer = new NetDataWriter();
+                    _writer.Put("Position");
+                    _writer.Put(player.PlayerId);
+                    _writer.Put(player.x);
+                    _writer.Put(player.y);
+                    _writer.Put(player.z);
+                    _writer.Put(player.AnimationState);
+                    _writer.Put(player.IsFacingRight);
+                    peer.Send(_writer, DeliveryMethod.Unreliable);
                 }
             }
         }
+    }
+
+    internal class PlayerData {
+        public int PlayerId { get; set; }
+        public NetPeer Peer { get; set; }
+        public float x { get; set; }
+        public float y { get; set; }
+        public float z { get; set; }
+        public string AnimationState { get; set; }
+        public bool IsFacingRight { get; set; }
     }
 }

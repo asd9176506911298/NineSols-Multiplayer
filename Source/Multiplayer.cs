@@ -6,7 +6,6 @@ using LiteNetLib.Utils;
 using NineSolsAPI;
 using NineSolsAPI.Utils;
 using System.Collections.Generic;
-using System.Threading;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -14,264 +13,230 @@ namespace Multiplayer {
     [BepInDependency(NineSolsAPICore.PluginGUID)]
     [BepInPlugin("com.example.multiplayer", "Multiplayer Plugin", "1.0.0")]
     public class Multiplayer : BaseUnityPlugin {
-        public static Multiplayer Instance { get; set; }
-        private Harmony harmony;
-        private NetManager client;
-        private NetDataWriter dataWriter;
-        private EventBasedNetListener listener;
+        public static Multiplayer Instance { get; private set; }
 
-        private float sendInterval = 0.05f; // 50ms
-        private float sendTimer = 0;
-        public string? localAnimationState;
-        // Dictionary to store other players' data
-        public Dictionary<int, PlayerData> playerObjects = new Dictionary<int, PlayerData>();
-        private int localPlayerId = -1;
+        private Harmony _harmony;
+        private NetManager _client;
+        private NetDataWriter _dataWriter;
+        private EventBasedNetListener _listener;
+
+        public readonly Dictionary<int, PlayerData> _playerObjects = new();
+        private int _localPlayerId = -1;
+
+        private string? currentAnimationState = string.Empty;
+        public string? localAnimationState = "";
+
+        private const float SendInterval = 0.02f;
+        private float _sendTimer;
 
         private void Awake() {
+            Instance = this;
             Log.Init(Logger);
             RCGLifeCycle.DontDestroyForever(gameObject);
 
-            harmony = Harmony.CreateAndPatchAll(typeof(Multiplayer).Assembly);
+            _harmony = Harmony.CreateAndPatchAll(typeof(Multiplayer).Assembly);
 
-            listener = new EventBasedNetListener();
-            client = new NetManager(listener) { AutoRecycle = true };
-            dataWriter = new NetDataWriter();
+            InitializeNetworking();
 
             KeybindManager.Add(this, ConnectToServer, () => new KeyboardShortcut(KeyCode.S));
             KeybindManager.Add(this, DisconnectFromServer, () => new KeyboardShortcut(KeyCode.C));
-            KeybindManager.Add(this, test, () => new KeyboardShortcut(KeyCode.V));
 
-
-            Instance = this;
             SceneManager.sceneLoaded += OnSceneLoaded;
 
             Log.Info("Multiplayer plugin initialized.");
         }
 
+        private void InitializeNetworking() {
+            _listener = new EventBasedNetListener();
+            _client = new NetManager(_listener) { AutoRecycle = true };
+            _dataWriter = new NetDataWriter();
+
+            _listener.NetworkReceiveEvent += OnNetworkReceiveEvent;
+            _listener.PeerDisconnectedEvent += OnPeerDisconnectedEvent;
+        }
+
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode) {
-            if (client.FirstPeer != null) {
-                DestroyAllPlayerObjects();
+            if (_client.FirstPeer != null) {
+                ClearPlayerObjects();
             }
-        }
-
-        public void SendDecreaseHealth(int playerId, float value) {
-            if (client.FirstPeer == null) {
-                ToastManager.Toast("Not connected to server.");
-                return;
-            }
-
-            dataWriter.Reset();
-            dataWriter.Put("DecreaseHealth");
-            dataWriter.Put(playerId);
-            dataWriter.Put(value);
-            client.FirstPeer.Send(dataWriter, DeliveryMethod.Unreliable);
-        }
-
-        void test() {
-            SendDecreaseHealth(0, 50f);
-            //CreatePlayerObject(Player.i.transform.position,1337);
-            return;
-            //ToastManager.Toast(Resources.Load<GameObject>("Global Prefabs/GameCore").GetComponent<GameCore>().player.gameObject);
-            var x = Instantiate(Resources.Load<GameObject>("Global Prefabs/GameCore").GetComponent<GameCore>().transform.Find("RCG LifeCycle"));
-            x.transform.Find("PPlayer").position = Player.i.transform.position;
-            x.transform.Find("PPlayer").position = new Vector3(x.transform.Find("PPlayer").position.x + 20f, x.transform.Find("PPlayer").position.y, x.transform.Find("PPlayer").position.z);
         }
 
         private void ConnectToServer() {
+            if (_client.IsRunning) return;
+
             ToastManager.Toast("Connecting to server...");
-            client.Start();
-            client.Connect("localhost", 9050, "SomeConnectionKey");
-            localPlayerId = -1;
-            DestroyAllPlayerObjects();
+            _client.Start();
+            _client.Connect("localhost", 9050, "SomeConnectionKey");
+            _localPlayerId = -1;
 
-            listener.NetworkReceiveEvent += OnNetworkReceiveEvent;
-            listener.PeerDisconnectedEvent += OnPeerDisconnectedEvent;
-
-            //listener.NetworkReceiveEvent += (peer, reader, deliveryMethod, channel) => {
-            //    HandleReceivedData(peer, reader);
-            //    reader.Recycle();
-            //};
-
-            //listener.PeerDisconnectedEvent += (peer, disconnectInfo) => {
-            //    // Clear player objects on disconnection
-            //    DestroyAllPlayerObjects();
-            //};
-        }
-
-        void OnNetworkReceiveEvent(NetPeer peer,NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod) {
-            HandleReceivedData(peer, reader);
-            reader.Recycle();
-        }
-
-        void OnPeerDisconnectedEvent(NetPeer peer,DisconnectInfo disconnectInfo) {
-            DestroyAllPlayerObjects();
+            ClearPlayerObjects();
         }
 
         private void DisconnectFromServer() {
-            localPlayerId = -1;
-            client?.DisconnectAll();
-            listener.NetworkReceiveEvent -= OnNetworkReceiveEvent;
-            listener.PeerDisconnectedEvent -= OnPeerDisconnectedEvent;
-            DestroyAllPlayerObjects();
+            if (!_client.IsRunning) return;
 
+            _client.DisconnectAll();
+            _client.Stop();
+            _localPlayerId = -1;
+
+            ClearPlayerObjects();
             ToastManager.Toast("Disconnected from server.");
         }
 
-        private void DestroyAllPlayerObjects() {
-            foreach (var playerData in playerObjects.Values) {
-                if (playerData.PlayerObject != null) {
-                    Destroy(playerData.PlayerObject);
-                }
+        private void ClearPlayerObjects() {
+            foreach (var playerData in _playerObjects.Values) {
+                Destroy(playerData.PlayerObject);
             }
-            playerObjects.Clear();
+            _playerObjects.Clear();
         }
 
+        private void Update() {
+            if (_client.IsRunning && _client.FirstPeer?.ConnectionState == ConnectionState.Connected) {
+                _sendTimer += Time.deltaTime;
+                if (_sendTimer >= SendInterval) {
+                    SendPosition();
+                    _sendTimer = 0;
+                }
+            }
+            _client.PollEvents();
+        }
 
-        private void SendPosition() {
-            if (client.FirstPeer == null) {
+        public void SendDecreaseHealth(int playerId, float value) {
+            if (_client.FirstPeer == null) {
                 ToastManager.Toast("Not connected to server.");
                 return;
             }
 
-            dataWriter.Reset();
-            dataWriter.Put("Position");
-            Vector3 position;
-            if (Player.i != null) {
-                position = Player.i.transform.position; // Use your player's position
-            }
-            else
-                position = Vector3.zero;
-            dataWriter.Put(position.x);
-            dataWriter.Put(position.y+6.5f);
-            dataWriter.Put(position.z);
-            dataWriter.Put(localAnimationState);
-            dataWriter.Put(Player.i.Facing.ToString().Equals("Right") ? true : false);
-            
-            client.FirstPeer.Send(dataWriter, DeliveryMethod.Unreliable);
+            _dataWriter.Reset();
+            _dataWriter.Put("DecreaseHealth");
+            _dataWriter.Put(playerId);
+            _dataWriter.Put(value);
+            _client.FirstPeer.Send(_dataWriter, DeliveryMethod.Unreliable);
         }
 
-        private void HandleReceivedData(NetPeer peer, NetDataReader reader) {
-            if (peer.ConnectionState != ConnectionState.Connected) return; // Ensure only active peers are processed
+        private void SendPosition() {
+            if (_localPlayerId == -1 || Player.i == null) return;
 
-            string messageType = reader.GetString();
-            
-            if (messageType == "Position") {
-                int playerId = reader.GetInt();
-                float x = reader.GetFloat();
-                float y = reader.GetFloat();
-                float z = reader.GetFloat();
-                string animState = reader.GetString();
-                bool isFacingRight = reader.GetBool();
+            _dataWriter.Reset();
+            _dataWriter.Put("Position");
+            var position = Player.i.transform.position;
+            _dataWriter.Put(position.x);
+            _dataWriter.Put(position.y + 6.5f);
+            _dataWriter.Put(position.z);
+            _dataWriter.Put(localAnimationState);
+            _dataWriter.Put(Player.i.Facing.ToString() == "Right");
 
-                // Only update other players' positions if we have received our localPlayerId
-                if (localPlayerId != -1 && playerId != localPlayerId) {
-                    UpdatePlayerData(playerId, new Vector3(x, y, z), animState, isFacingRight);
-                }
-            } else if (messageType == "localPlayerId") {
-                localPlayerId = reader.GetInt();
-                ToastManager.Toast($"Local Player ID set to {localPlayerId}");
-            } else if (messageType == "DestoryDisconnectObject") {
-                int playerId = reader.GetInt();
-                Destroy(playerObjects[playerId].PlayerObject);
-                playerObjects.Remove(playerId);
-            }else if (messageType == "DecreaseHealth") {
-                ToastManager.Toast("DecreaseHealth");
-                int playerId = reader.GetInt();
-                float value = reader.GetFloat();
-                if(playerId == localPlayerId) {
-                    Player.i.health.ReceiveDOT_Damage(value);
-                    Player.i.ChangeState(PlayerStateType.Hurt, true);
-                }
-            }
+            _client.FirstPeer.Send(_dataWriter, DeliveryMethod.Unreliable);
         }
 
-        private string currentAnimationState = string.Empty;  // Variable to store the current animation state
+        private void OnNetworkReceiveEvent(NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod) {
+            HandleReceivedData(reader);
+            reader.Recycle();
+        }
 
-        private void UpdatePlayerData(int playerId, Vector3 newPosition, string animationState, bool isFacingRight) {
-            if (playerObjects.TryGetValue(playerId, out var playerData)) {
-                // Smooth position interpolation
-                playerData.PlayerObject.transform.position = Vector3.Lerp(
-                    playerData.PlayerObject.transform.position,
-                    newPosition,
-                    Time.deltaTime * 50f // Adjust the speed of interpolation
-                );
+        private void OnPeerDisconnectedEvent(NetPeer peer, DisconnectInfo disconnectInfo) {
+            ClearPlayerObjects();
+        }
 
-                // Correct the scaling for flipping the player
-                playerData.PlayerObject.transform.localScale = new Vector3(
-                    Mathf.Abs(playerData.PlayerObject.transform.localScale.x) * (isFacingRight ? 1 : -1),
-                    playerData.PlayerObject.transform.localScale.y,
-                    playerData.PlayerObject.transform.localScale.z
-                );
+        private void HandleReceivedData(NetDataReader reader) {
+            var messageType = reader.GetString();
 
-                // Ensure animator component is valid
-                Animator animator = playerData.PlayerObject.GetComponent<Animator>();
-                if (animator == null) {
-                    Debug.LogError("Animator not found on player object!");
-                    return;
-                }
-
-                // Check if the animation state is different from the current one
-                if (animationState != currentAnimationState) {
-                    currentAnimationState = animationState;
-
-                    // Use CrossFade for smooth transition to the new animation
-                    animator.CrossFade(animationState, 0.1f, 0, 0f);  // Smooth transition to the new animation
-                }
-
-                // Check if the animation is currently playing and handle looping
-                if (animator.GetCurrentAnimatorStateInfo(0).IsName(animationState)) {
-                    if (animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1f) {
-                        // Ensure full playback for looping (Reset normalizedTime if loop is enabled)
-                        animator.Play(animationState, 0, 0f);  // Ensures animation loops fully
-                    }
-                }
-            } else {
-                // Instantiate a new player object if not found
-                GameObject playerObject;
-                if (Player.i != null)
-                    playerObject = CreatePlayerObject(newPosition, playerId);
-                else
-                    playerObject = new GameObject($"Player{playerId}");
-
-                playerObjects[playerId] = new PlayerData(playerObject, newPosition);
+            switch (messageType) {
+                case "Position":
+                    HandlePositionMessage(reader);
+                    break;
+                case "localPlayerId":
+                    _localPlayerId = reader.GetInt();
+                    ToastManager.Toast($"Assigned Player ID: {_localPlayerId}");
+                    break;
+                case "DecreaseHealth":
+                    HandleDecreaseHealth(reader);
+                    break;
+                case "DestroyDisconnectObject":
+                    HandleDisconnectObject(reader);
+                    break;
+                default:
+                    Log.Warning($"Unknown message type: {messageType}");
+                    break;
             }
         }
 
+        private void HandlePositionMessage(NetDataReader reader) {
+            var playerId = reader.GetInt();
+            var position = new Vector3(reader.GetFloat(), reader.GetFloat(), reader.GetFloat());
+            var AnimationState = reader.GetString();
+            var isFacingRight = reader.GetBool();
 
+            if (_localPlayerId == playerId) return; // Skip updating local player data
 
+            if (!_playerObjects.TryGetValue(playerId, out var playerData)) {
+                playerData = CreatePlayerObject(playerId, position);
+                _playerObjects[playerId] = playerData;
+            }
 
-
-
-
-        GameObject CreatePlayerObject(Vector3 pos, int playerid) {
-            var x = Instantiate(Player.i.transform.Find("RotateProxy/SpriteHolder").gameObject, pos, Quaternion.identity);
-            x.transform.Find("Health(Don'tKey)").Find("DamageReceiver").GetComponent<EffectReceiver>().effectType = EffectType.EnemyAttack | EffectType.BreakableBreaker | EffectType.ShieldBreak | EffectType.PostureDecreaseEffect;
-            x.name = $"PlayerObject_{playerid}";
-            return x;
+            UpdatePlayerObject(playerData, position, AnimationState, isFacingRight);
         }
 
-        private void Update() {
-            if (client?.FirstPeer != null && client.FirstPeer.ConnectionState == ConnectionState.Connected) {
-                sendTimer += Time.deltaTime;
-                if (sendTimer >= sendInterval) {
-                    SendPosition();
-                    sendTimer = 0;
+        private void HandleDecreaseHealth(NetDataReader reader) {
+            var playerId = reader.GetInt();
+            var damage = reader.GetFloat();
+
+            if (playerId == _localPlayerId && Player.i != null) {
+                Player.i.health.ReceiveDOT_Damage(damage);
+                Player.i.ChangeState(PlayerStateType.Hurt, true);
+            }
+        }
+
+        private void HandleDisconnectObject(NetDataReader reader) {
+            var playerId = reader.GetInt();
+            if (_playerObjects.TryGetValue(playerId, out var playerData)) {
+                Destroy(playerData.PlayerObject);
+                _playerObjects.Remove(playerId);
+            }
+        }
+
+        private PlayerData CreatePlayerObject(int playerId, Vector3 position) {
+            var playerObject = Instantiate(Player.i.transform.Find("RotateProxy/SpriteHolder").gameObject, position, Quaternion.identity);
+            playerObject.name = $"Player_{playerId}";
+            return new PlayerData(playerObject, position);
+        }
+
+        private void UpdatePlayerObject(PlayerData playerData, Vector3 position,string animationState, bool isFacingRight) {
+            var playerObject = playerData.PlayerObject;
+
+            playerObject.transform.position = Vector3.Lerp(playerObject.transform.position, position, Time.deltaTime * 100f);
+
+            Animator animator = playerData.PlayerObject.GetComponent<Animator>();
+            if (animator == null) {
+                Debug.LogError("Animator not found on player object!");
+                return;
+            }
+
+            // Check if the animation state is different from the current one
+            if (animationState != currentAnimationState) {
+                currentAnimationState = animationState;
+
+                // Use CrossFade for smooth transition to the new animation
+                animator.CrossFade(animationState, 0.1f, 0, 0f);  // Smooth transition to the new animation
+            }
+
+            // Check if the animation is currently playing and handle looping
+            if (animator.GetCurrentAnimatorStateInfo(0).IsName(animationState)) {
+                if (animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1f) {
+                    // Ensure full playback for looping (Reset normalizedTime if loop is enabled)
+                    animator.Play(animationState, 0, 0f);  // Ensures animation loops fully
                 }
             }
-            client?.PollEvents();
+
+            var scale = playerObject.transform.localScale;
+            scale.x = Mathf.Abs(scale.x) * (isFacingRight ? 1 : -1);
+            playerObject.transform.localScale = scale;
         }
-
-
 
         private void OnDestroy() {
-            harmony.UnpatchSelf();
-            listener.NetworkReceiveEvent -= OnNetworkReceiveEvent;
-            listener.PeerDisconnectedEvent -= OnPeerDisconnectedEvent;
+            _harmony.UnpatchSelf();
             SceneManager.sceneLoaded -= OnSceneLoaded;
             DisconnectFromServer();
-            client?.Stop();
         }
-
-
     }
 }

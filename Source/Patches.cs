@@ -24,7 +24,6 @@ public class Patches {
         if (__instance.name == "SpriteHolder") {
             if (Multiplayer.Instance.localAnimationState != stateName) {
                 Multiplayer.Instance.localAnimationState = stateName;
-                ToastManager.Toast(stateName);
             }
         }
 
@@ -38,9 +37,7 @@ public class Patches {
 
 
         if (__instance.transform.parent.parent.name.StartsWith("PlayerObject_")) {
-            ToastManager.Toast($"{__instance.transform.parent.parent.name.StartsWith("PlayerObject_")} Owner:{__instance.Owner} dealer:{data.dealer.owner}");
-            foreach (var x in Multiplayer.Instance.playerObjects.Values) {
-                ToastManager.Toast($"id:{x.id} {x.PlayerObject == __instance.transform.parent.parent.gameObject}");
+            foreach (var x in Multiplayer.Instance._playerObjects.Values) {
                 if (x.PlayerObject == __instance.transform.parent.parent.gameObject)
                     Multiplayer.Instance.SendDecreaseHealth(x.id, data.dealer.FinalValue);
             }
