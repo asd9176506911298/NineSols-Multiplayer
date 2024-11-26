@@ -48,7 +48,7 @@ namespace Multiplayer {
 
                 //titlescreenModifications.Load();
 
-                ip = Config.Bind("", "Server Ip", "127.0.0.1", "");
+                ip = Config.Bind("", "Server Ip", "yukikaco.ddns.net", "");
                 port = Config.Bind("", "Server Port", 9050, "");
                 join = Config.Bind("", "Join Server Button", false, "");
                 leave = Config.Bind("", "Leave Server Button", false, "");
