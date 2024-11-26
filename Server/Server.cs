@@ -13,7 +13,7 @@ namespace Server {
 
         private const int Port = 9050;
         private const string ConnectionKey = "SomeConnectionKey";
-        private const int MaxConnections = 10;
+        private const int MaxConnections = 50;
 
         static void Main(string[] args) {
             Console.WriteLine("Starting Server...");
