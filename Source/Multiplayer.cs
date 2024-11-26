@@ -208,8 +208,6 @@ namespace Multiplayer {
             if (playerId == _localPlayerId && Player.i != null) {
                 Player.i.health.ReceiveDOT_Damage(damage);
                 Player.i.ChangeState(PlayerStateType.Hurt, true);
-                if (Player.i.health.currentValue <= 0)
-                    Player.i.Suicide();
             }
         }
 
