@@ -38,7 +38,7 @@ namespace Server {
         }
 
         private static void RunServerLoop() {
-            while (!Console.KeyAvailable) {
+            while (true) {
                 _server.PollEvents();
                 Thread.Sleep(15); // Reduce CPU usage
             }
