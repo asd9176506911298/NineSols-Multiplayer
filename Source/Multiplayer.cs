@@ -54,8 +54,8 @@ namespace Multiplayer {
                 leave = Config.Bind("", "Leave Server Button", false, "");
 
 #if DEBUG
-                KeybindManager.Add(this, ConnectToServer, () => new KeyboardShortcut(KeyCode.S));
-                KeybindManager.Add(this, DisconnectFromServer, () => new KeyboardShortcut(KeyCode.C));
+                KeybindManager.Add(this, ConnectToServer, () => new KeyboardShortcut(KeyCode.S,KeyCode.LeftControl));
+                KeybindManager.Add(this, DisconnectFromServer, () => new KeyboardShortcut(KeyCode.Q,KeyCode.LeftControl));
 #endif
 
                 join.SettingChanged += (_, _) => { if (join.Value) ConnectToServer(); join.Value = false; };
@@ -220,11 +220,36 @@ namespace Multiplayer {
         }
 
         private PlayerData CreatePlayerObject(int playerId, Vector3 position) {
-            var playerObject = Instantiate(Player.i.transform.Find("RotateProxy/SpriteHolder").gameObject, position, Quaternion.identity);
-            playerObject.transform.Find("Health(Don'tKey)").Find("DamageReceiver").GetComponent<EffectReceiver>().effectType = EffectType.EnemyAttack | EffectType.BreakableBreaker | EffectType.ShieldBreak | EffectType.PostureDecreaseEffect;
+            // Instantiate the player object
+            var playerObject = Instantiate(
+                Player.i.transform.Find("RotateProxy/SpriteHolder").gameObject,
+                position,
+                Quaternion.identity
+            );
+
+            // Update effect type on the EffectReceiver component
+            var effectReceiver = playerObject.transform
+                .Find("Health(Don'tKey)/DamageReceiver")
+                .GetComponent<EffectReceiver>();
+            if (effectReceiver != null) {
+                effectReceiver.effectType = EffectType.EnemyAttack |
+                                            EffectType.BreakableBreaker |
+                                            EffectType.ShieldBreak |
+                                            EffectType.PostureDecreaseEffect;
+            }
+
+            // Disable all AbilityActivateChecker components
+            foreach (var abilityChecker in playerObject.GetComponentsInChildren<AbilityActivateChecker>(true)) {
+                abilityChecker.enabled = false;
+            }
+
+            // Set player object name
             playerObject.name = $"PlayerObject_{playerId}";
-            return new PlayerData(playerObject, position,playerId);
+
+            // Return the player data
+            return new PlayerData(playerObject, position, playerId);
         }
+
 
         private void UpdatePlayerObject(PlayerData playerData, Vector3 position, string animationState, bool isFacingRight) {
             var playerObject = playerData.PlayerObject;
