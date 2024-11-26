@@ -13,7 +13,7 @@ using UnityEngine.SceneManagement;
 
 namespace Multiplayer {
     [BepInDependency(NineSolsAPICore.PluginGUID)]
-    [BepInPlugin("com.example.multiplayer", "Multiplayer Plugin", "1.0.0")]
+    [BepInPlugin(PluginInfo.PLUGIN_GUID, PluginInfo.PLUGIN_NAME, PluginInfo.PLUGIN_VERSION)]
     public class Multiplayer : BaseUnityPlugin {
         public static Multiplayer Instance { get; private set; }
 
@@ -22,7 +22,12 @@ namespace Multiplayer {
         private NetDataWriter _dataWriter;
         private EventBasedNetListener _listener;
 
-        private TitlescreenModifications titlescreenModifications = new();
+        private ConfigEntry<string> ip;
+        private ConfigEntry<int> port;
+        private ConfigEntry<bool> join;
+        private ConfigEntry<bool> leave;
+
+        //private TitlescreenModifications titlescreenModifications = new();
 
         public readonly Dictionary<int, PlayerData> _playerObjects = new();
         private int _localPlayerId = -1;
@@ -41,10 +46,20 @@ namespace Multiplayer {
                 _harmony = Harmony.CreateAndPatchAll(typeof(Multiplayer).Assembly);
                 InitializeNetworking();
 
-                titlescreenModifications.Load();
+                //titlescreenModifications.Load();
 
+                ip = Config.Bind("", "Server Ip", "127.0.0.1", "");
+                port = Config.Bind("", "Server Port", 9050, "");
+                join = Config.Bind("", "Join Server Button", false, "");
+                leave = Config.Bind("", "Leave Server Button", false, "");
+
+#if DEBUG
                 KeybindManager.Add(this, ConnectToServer, () => new KeyboardShortcut(KeyCode.S));
                 KeybindManager.Add(this, DisconnectFromServer, () => new KeyboardShortcut(KeyCode.C));
+#endif
+
+                join.SettingChanged += (_, _) => { if (join.Value) ConnectToServer(); join.Value = false; };
+                leave.SettingChanged += (_, _) => { if (leave.Value) DisconnectFromServer(); leave.Value = false; };
 
                 SceneManager.sceneLoaded += OnSceneLoaded;
             } catch (Exception e) {
@@ -68,7 +83,7 @@ namespace Multiplayer {
                 ClearPlayerObjects();
             }
 
-            titlescreenModifications.MaybeExtendMainMenu(scene);
+            //titlescreenModifications.MaybeExtendMainMenu(scene);
         }
 
         private void ConnectToServer() {
@@ -76,7 +91,7 @@ namespace Multiplayer {
 
             ToastManager.Toast("Connecting to server...");
             _client.Start();
-            _client.Connect("localhost", 9050, "SomeConnectionKey");
+            _client.Connect(ip.Value, port.Value, "SomeConnectionKey");
             _localPlayerId = -1;
             ClearPlayerObjects();
         }
@@ -239,7 +254,7 @@ namespace Multiplayer {
         private void OnDestroy() {
             _harmony.UnpatchSelf();
             SceneManager.sceneLoaded -= OnSceneLoaded;
-            titlescreenModifications.Unload();
+            //titlescreenModifications.Unload();
             DisconnectFromServer();
         }
     }

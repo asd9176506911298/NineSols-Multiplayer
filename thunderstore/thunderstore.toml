@@ -2,16 +2,17 @@
 schemaVersion = "0.0.1"
 
 [package]
-namespace = "yournamespace"
-name = "YourModName"
+namespace = "Multiplayer"
+name = "Multiplayer"
 versionNumber = "0.1.0"
-description = "your mod description"
-websiteUrl = "link to the git repo"
+description = "Multiplayer"
+websiteUrl = "https://github.com/asd9176506911298/NineSols-Multiplayer"
 containsNsfwContent = false
 
 [package.dependencies]
 "BepInEx-BepInExPack" = "5.4.2100"
-"ninesolsmodding-NineSolsAPI" = "0.0.2"
+"ninesolsmodding-NineSolsAPI" = "0.4.1"
+"ninesolsmodding-BepinExConfigurationManager" = "18.3.1"
 
 [build]
 icon = "./icon.png"
