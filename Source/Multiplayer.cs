@@ -26,6 +26,7 @@ namespace Multiplayer {
         private ConfigEntry<int> port;
         private ConfigEntry<bool> join;
         private ConfigEntry<bool> leave;
+        private ConfigEntry<bool> isPVP;
 
         //private TitlescreenModifications titlescreenModifications = new();
 
@@ -52,10 +53,12 @@ namespace Multiplayer {
                 port = Config.Bind("", "Server Port", 9050, "");
                 join = Config.Bind("", "Join Server Button", false, "");
                 leave = Config.Bind("", "Leave Server Button", false, "");
+                isPVP = Config.Bind("", "is Enable PVP", false, "");
 
 #if DEBUG
                 KeybindManager.Add(this, ConnectToServer, () => new KeyboardShortcut(KeyCode.S,KeyCode.LeftControl));
                 KeybindManager.Add(this, DisconnectFromServer, () => new KeyboardShortcut(KeyCode.Q,KeyCode.LeftControl));
+                ip.Value = "127.0.0.1";
 #endif
 
                 join.SettingChanged += (_, _) => { if (join.Value) ConnectToServer(); join.Value = false; };
@@ -205,7 +208,7 @@ namespace Multiplayer {
             var playerId = reader.GetInt();
             var damage = reader.GetFloat();
 
-            if (playerId == _localPlayerId && Player.i != null) {
+            if (playerId == _localPlayerId && Player.i != null && isPVP.Value) {
                 Player.i.health.ReceiveDOT_Damage(damage);
                 Player.i.ChangeState(PlayerStateType.Hurt, true);
             }
