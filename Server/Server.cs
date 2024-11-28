@@ -86,7 +86,6 @@ namespace Server {
             Console.WriteLine($"Player {peer.Id} connected.");
             AddNewPlayer(peer);
             SendLocalPlayerId(peer);
-            BroadcastSystemMessage($"{peer.Id} connected. Player Count:{_server.ConnectedPeersCount}", peer);
 
             _writer = new NetDataWriter();
             _writer.Put("PvPEnabled");
@@ -94,7 +93,7 @@ namespace Server {
             peer.Send(_writer, DeliveryMethod.ReliableOrdered);
 
             _writer = new NetDataWriter();
-            _writer.Put($"Player Count:{_server.ConnectedPeersCount}");
+            _writer.Put($"Server Player Count:{_server.ConnectedPeersCount}");
             peer.Send(_writer, DeliveryMethod.ReliableOrdered);
         }
 
@@ -103,7 +102,6 @@ namespace Server {
             RemovePlayer(peer.Id);
 
             NotifyPlayersAboutDisconnection(peer.Id);
-            BroadcastSystemMessage($"{peer.Id} disconnected. Player Count:{_server.ConnectedPeersCount}", peer);
         }
 
         private static void NotifyPlayersAboutDisconnection(int playerId) {
@@ -124,6 +122,21 @@ namespace Server {
                     break;
                 case "DecreaseHealth":
                     HandleDecreaseHealth(peer, reader);
+                    break;
+                case "Join":
+                    var name = reader.GetString();
+                    _players[peer.Id].name = name;
+                    var playersName = "";
+                    foreach (var x in _players.Values) {
+                        playersName += ", "+ x.name;
+                    }
+                    Console.WriteLine(playersName);
+                    BroadcastSystemMessage($"{name} connected. Player Count:{_server.ConnectedPeersCount}\n{playersName}", peer);
+                    
+                    break;
+                case "Leave":
+                    var namee = reader.GetString();
+                    BroadcastSystemMessage($"{namee} disconnected. Player Count:{_server.ConnectedPeersCount}", peer);
                     break;
                 default:
                     Console.WriteLine($"Unknown message type: {messageType}");
@@ -157,7 +170,8 @@ namespace Server {
         private static void AddNewPlayer(NetPeer peer) {
             var newPlayer = new PlayerData {
                 PlayerId = peer.Id,
-                Peer = peer
+                Peer = peer,
+                name = ""
             };
 
             _players[peer.Id] = newPlayer;

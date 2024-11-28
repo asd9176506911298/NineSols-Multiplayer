@@ -8,4 +8,5 @@ class PlayerData {
     public float z { get; set; }
     public string AnimationState { get; set; }
     public bool isFacingRight { get; set; }
+    public string name { get; set; }
 }

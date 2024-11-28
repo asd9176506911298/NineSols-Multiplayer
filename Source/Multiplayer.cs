@@ -8,6 +8,7 @@ using NineSolsAPI.Menu;
 using NineSolsAPI.Utils;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -27,6 +28,7 @@ namespace Multiplayer {
         private ConfigEntry<bool> join;
         private ConfigEntry<bool> leave;
         private ConfigEntry<string> pvp;
+        private ConfigEntry<string> playerName;
         public bool isPVP;
 
         //private TitlescreenModifications titlescreenModifications = new();
@@ -55,6 +57,7 @@ namespace Multiplayer {
                 join = Config.Bind("", "Join Server Button", false, "");
                 leave = Config.Bind("", "Leave Server Button", false, "");
                 pvp = Config.Bind("", "Server PVP State", "", "");
+                playerName = Config.Bind("", "Your Player Name", "", "");
 
 #if DEBUG
                 KeybindManager.Add(this, ConnectToServer, () => new KeyboardShortcut(KeyCode.S,KeyCode.LeftControl));
@@ -100,15 +103,25 @@ namespace Multiplayer {
             ClearPlayerObjects();
         }
 
-        private void DisconnectFromServer() {
+        private async void DisconnectFromServer() {
             if (!_client.IsRunning) return;
 
+            _dataWriter.Reset();
+            _dataWriter.Put("Leave");
+            _dataWriter.Put(playerName.Value);
+            _client.FirstPeer.Send(_dataWriter, DeliveryMethod.Unreliable);
+
+            // Wait briefly to ensure the message is sent
+            await Task.Delay(100); // Adjust the delay as needed (100 ms is usually enough)
+
+            // Proceed with disconnection
             _client.DisconnectAll();
             _client.Stop();
             _localPlayerId = -1;
             ClearPlayerObjects();
             ToastManager.Toast("Disconnected from server.");
         }
+
 
         private void ClearPlayerObjects() {
             foreach (var playerData in _playerObjects.Values) {
@@ -174,6 +187,10 @@ namespace Multiplayer {
                     break;
                 case "localPlayerId":
                     _localPlayerId = reader.GetInt();
+                    _dataWriter.Reset();
+                    _dataWriter.Put("Join");
+                    _dataWriter.Put(playerName.Value);
+                    _client.FirstPeer.Send(_dataWriter, DeliveryMethod.Unreliable);
                     //ToastManager.Toast($"Assigned Player ID: {_localPlayerId}");
                     break;
                 case "DecreaseHealth":
