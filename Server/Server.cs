@@ -195,7 +195,7 @@ namespace Server {
 
             foreach (var peer in _server.ConnectedPeerList) {
                 if (peer != excludePeer) {
-                    peer.Send(_writer, DeliveryMethod.Unreliable);
+                    peer.Send(_writer, DeliveryMethod.ReliableOrdered);
                 }
             }
         }

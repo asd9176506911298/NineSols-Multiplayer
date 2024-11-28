@@ -106,21 +106,28 @@ namespace Multiplayer {
         private async void DisconnectFromServer() {
             if (!_client.IsRunning) return;
 
+            // Send the "Leave" message reliably
             _dataWriter.Reset();
             _dataWriter.Put("Leave");
             _dataWriter.Put(playerName.Value);
-            _client.FirstPeer.Send(_dataWriter, DeliveryMethod.Unreliable);
+            _client.FirstPeer.Send(_dataWriter, DeliveryMethod.ReliableOrdered);
 
-            // Wait briefly to ensure the message is sent
-            await Task.Delay(100); // Adjust the delay as needed (100 ms is usually enough)
+            // Wait for the message to be processed
+            const int MaxWaitTime = 500; // Maximum wait time in milliseconds
+            int elapsedTime = 0;
+            while (_client.FirstPeer.ConnectionState != ConnectionState.Disconnected && elapsedTime < MaxWaitTime) {
+                await Task.Delay(50); // Check every 50 ms
+                elapsedTime += 50;
+            }
 
-            // Proceed with disconnection
+            // Disconnect the client
             _client.DisconnectAll();
             _client.Stop();
             _localPlayerId = -1;
             ClearPlayerObjects();
             ToastManager.Toast("Disconnected from server.");
         }
+
 
 
         private void ClearPlayerObjects() {
