@@ -174,7 +174,7 @@ namespace Multiplayer {
                     break;
                 case "localPlayerId":
                     _localPlayerId = reader.GetInt();
-                    ToastManager.Toast($"Assigned Player ID: {_localPlayerId}");
+                    //ToastManager.Toast($"Assigned Player ID: {_localPlayerId}");
                     break;
                 case "DecreaseHealth":
                     HandleDecreaseHealth(reader);

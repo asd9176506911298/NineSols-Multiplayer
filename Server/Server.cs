@@ -86,20 +86,24 @@ namespace Server {
             Console.WriteLine($"Player {peer.Id} connected.");
             AddNewPlayer(peer);
             SendLocalPlayerId(peer);
-            BroadcastSystemMessage($"{peer.Id} connected to the server.", peer);
+            BroadcastSystemMessage($"{peer.Id} connected. Player Count:{_server.ConnectedPeersCount}", peer);
 
             _writer = new NetDataWriter();
             _writer.Put("PvPEnabled");
             _writer.Put(_isPvPEnabled);
+            peer.Send(_writer, DeliveryMethod.ReliableOrdered);
+
+            _writer = new NetDataWriter();
+            _writer.Put($"Player Count:{_server.ConnectedPeersCount}");
             peer.Send(_writer, DeliveryMethod.ReliableOrdered);
         }
 
         private static void HandlePeerDisconnected(NetPeer peer) {
             Console.WriteLine($"Player {peer.Id} disconnected.");
             RemovePlayer(peer.Id);
-            BroadcastSystemMessage($"{peer.Id} disconnected from the server.", peer);
 
             NotifyPlayersAboutDisconnection(peer.Id);
+            BroadcastSystemMessage($"{peer.Id} disconnected. Player Count:{_server.ConnectedPeersCount}", peer);
         }
 
         private static void NotifyPlayersAboutDisconnection(int playerId) {
