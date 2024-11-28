@@ -26,7 +26,8 @@ namespace Multiplayer {
         private ConfigEntry<int> port;
         private ConfigEntry<bool> join;
         private ConfigEntry<bool> leave;
-        private ConfigEntry<bool> isPVP;
+        private ConfigEntry<string> pvp;
+        public bool isPVP;
 
         //private TitlescreenModifications titlescreenModifications = new();
 
@@ -53,7 +54,7 @@ namespace Multiplayer {
                 port = Config.Bind("", "Server Port", 9050, "");
                 join = Config.Bind("", "Join Server Button", false, "");
                 leave = Config.Bind("", "Leave Server Button", false, "");
-                isPVP = Config.Bind("", "is Enable PVP", false, "");
+                pvp = Config.Bind("", "Server PVP State", "", "");
 
 #if DEBUG
                 KeybindManager.Add(this, ConnectToServer, () => new KeyboardShortcut(KeyCode.S,KeyCode.LeftControl));
@@ -181,10 +182,20 @@ namespace Multiplayer {
                 case "DestroyDisconnectObject":
                     HandleDisconnectObject(reader);
                     break;
+                case "PvPEnabled":
+                    enablePVP(reader);
+                    break;
                 default:
-                    Log.Warning($"Unknown message type: {messageType}");
+                    ToastManager.Toast(messageType);
                     break;
             }
+        }
+
+        private void enablePVP(NetDataReader reader) {
+            var enable = reader.GetBool();
+            isPVP = enable;
+            pvp.Value = enable ? "PVP Enable" : "PVP Disable";
+            ToastManager.Toast($"PvP {(enable ? "Enabled" : "Disabled")}");
         }
 
         private void HandlePositionMessage(NetDataReader reader) {
@@ -197,7 +208,6 @@ namespace Multiplayer {
 
             if (!_playerObjects.TryGetValue(playerId, out var playerData)) {
                 playerData = CreatePlayerObject(playerId, position);
-                ToastManager.Toast(playerData.id);
                 _playerObjects[playerId] = playerData;
             }
 
@@ -208,7 +218,7 @@ namespace Multiplayer {
             var playerId = reader.GetInt();
             var damage = reader.GetFloat();
 
-            if (playerId == _localPlayerId && Player.i != null && isPVP.Value) {
+            if (playerId == _localPlayerId && Player.i != null) {
                 Player.i.health.ReceiveDOT_Damage(damage);
                 Player.i.ChangeState(PlayerStateType.Hurt, true);
             }

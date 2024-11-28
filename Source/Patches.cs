@@ -20,7 +20,7 @@ namespace Multiplayer {
         public static bool OnHitEnter(EffectReceiver __instance, EffectHitData data) {
             if (__instance.transform.parent.parent.name.StartsWith("PlayerObject_")) {
                 foreach (var playerData in Multiplayer.Instance._playerObjects.Values) {
-                    if (playerData.PlayerObject == __instance.transform.parent.parent.gameObject) {
+                    if (playerData.PlayerObject == __instance.transform.parent.parent.gameObject && Multiplayer.Instance.isPVP) {
                         Multiplayer.Instance.SendDecreaseHealth(playerData.id, data.dealer.FinalValue);
                     }
                 }

@@ -4,6 +4,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Server {
     internal class Server {
@@ -14,6 +15,8 @@ namespace Server {
         private const int Port = 9050;
         private const string ConnectionKey = "SomeConnectionKey";
         private const int MaxConnections = 50;
+
+        private static bool _isPvPEnabled = false; // PvP state
 
         static void Main(string[] args) {
             Console.WriteLine("Starting Server...");
@@ -34,7 +37,39 @@ namespace Server {
             listener.PeerDisconnectedEvent += (peer, disconnectInfo) => HandlePeerDisconnected(peer);
             listener.NetworkReceiveEvent += (peer, reader, deliveryMethod, channel) => HandleNetworkReceive(peer, reader);
 
+            Task.Run(() => CommandLoop());
+
             RunServerLoop();
+        }
+
+        private static void CommandLoop() {
+            while (true) {
+                var command = Console.ReadLine()?.Trim();
+                if (string.IsNullOrEmpty(command)) continue;
+
+                if (command.Equals("pvp 1", StringComparison.OrdinalIgnoreCase)) {
+                    EnablePvP(true);
+                }
+                else if (command.Equals("pvp 0", StringComparison.OrdinalIgnoreCase)) {
+                    EnablePvP(false);
+                } else {
+                    Console.WriteLine($"Unknown command: {command}");
+                }
+            }
+        }
+
+        private static void EnablePvP(bool enable) {
+            _isPvPEnabled = enable;
+            Console.WriteLine($"PvP has been {(_isPvPEnabled ? "enabled" : "disabled")}!");
+
+            // Notify all players about the PvP state
+            _writer = new NetDataWriter();
+            _writer.Put("PvPEnabled");
+            _writer.Put(enable);
+
+            foreach (var peer in _server.ConnectedPeerList) {
+                peer.Send(_writer, DeliveryMethod.ReliableOrdered);
+            }
         }
 
         private static void RunServerLoop() {
@@ -52,6 +87,11 @@ namespace Server {
             AddNewPlayer(peer);
             SendLocalPlayerId(peer);
             BroadcastSystemMessage($"{peer.Id} connected to the server.", peer);
+
+            _writer = new NetDataWriter();
+            _writer.Put("PvPEnabled");
+            _writer.Put(_isPvPEnabled);
+            peer.Send(_writer, DeliveryMethod.ReliableOrdered);
         }
 
         private static void HandlePeerDisconnected(NetPeer peer) {
