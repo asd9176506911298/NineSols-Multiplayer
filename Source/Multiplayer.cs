@@ -287,6 +287,10 @@ namespace Multiplayer {
                 Quaternion.identity
             );
 
+            AutoAttributeManager.AutoReference(playerObject);
+            AutoAttributeManager.AutoReferenceAllChildren(playerObject);
+
+
             // Update effect type on the EffectReceiver component
             var effectReceiver = playerObject.transform
                 .Find("Health(Don'tKey)/DamageReceiver")
