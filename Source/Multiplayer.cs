@@ -62,6 +62,7 @@ namespace Multiplayer {
 #if DEBUG
                 KeybindManager.Add(this, ConnectToServer, () => new KeyboardShortcut(KeyCode.S,KeyCode.LeftControl));
                 KeybindManager.Add(this, DisconnectFromServer, () => new KeyboardShortcut(KeyCode.Q,KeyCode.LeftControl));
+                KeybindManager.Add(this, test, () => new KeyboardShortcut(KeyCode.H, KeyCode.LeftControl));
                 ip.Value = "127.0.0.1";
 #endif
 
@@ -75,6 +76,28 @@ namespace Multiplayer {
 
             Log.Info("Multiplayer plugin initialized.");
         }
+#if DEBUG
+        void test() {
+            ToastManager.Toast("test");
+            foreach(var x in Resources.FindObjectsOfTypeAll<ParriableAttackEffect>()) {
+                ToastManager.Toast(GetGameObjectPath(x.gameObject));
+            }
+            //var x = Instantiate(Resources.Load<GameObject>("Global Prefabs/GameCore").GetComponent<GameCore>().transform.Find("RCG LifeCycle").gameObject, Player.i.transform.position, Quaternion.identity);
+            //Player.i.ChangeState(PlayerStateType.Parry);
+        }
+
+        string GetGameObjectPath(GameObject obj) {
+            string path = obj.name;
+            Transform current = obj.transform;
+
+            while (current.parent != null) {
+                current = current.parent;
+                path = current.name + "/" + path;
+            }
+
+            return path;
+        }
+#endif
 
         private void InitializeNetworking() {
             _listener = new EventBasedNetListener();
