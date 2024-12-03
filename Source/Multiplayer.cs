@@ -65,6 +65,7 @@ namespace Multiplayer {
                 KeybindManager.Add(this, DisconnectFromServer, () => new KeyboardShortcut(KeyCode.Q,KeyCode.LeftControl));
                 KeybindManager.Add(this, StartMemoryChallenge, () => new KeyboardShortcut(KeyCode.Z));
                 KeybindManager.Add(this, test, () => new KeyboardShortcut(KeyCode.H, KeyCode.LeftControl));
+                KeybindManager.Add(this, test2, () => new KeyboardShortcut(KeyCode.X, KeyCode.LeftControl));
                 ip.Value = "127.0.0.1";
 #endif
 
@@ -108,13 +109,24 @@ namespace Multiplayer {
 
             return targetComponent;
         }
+        void test2() {
+            // Array of player object names
+            string[] playerObjectNames = { "PlayerObject_0", "PlayerObject_1", "PlayerObject_2", "PlayerObject_3" };
 
+            // Loop through each player object
+            foreach (string playerName in playerObjectNames) {
+                GameObject playerObject = GameObject.Find(playerName);
+                if (playerObject != null) {
+                    Animator animator = playerObject.GetComponent<Animator>();
+                    if (animator != null) {
+                        animator.PlayInFixedTime("Attack1", 0, 0f);
+                    }
+                }
+            }
+
+        }
         void test() {
             ToastManager.Toast("test");
-
-            //Player.i.Suicide();
-            var x = Instantiate(Resources.Load<GameObject>("Global Prefabs/GameCore").transform.Find("RCG LifeCycle"));
-            x.transform.Find("PPlayer").transform.position = Player.i.transform.position;
 
             var effectReceiver = Player.i.transform
                         .Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")
@@ -128,39 +140,7 @@ namespace Multiplayer {
                                             EffectType.PostureDecreaseEffect;
             }
 
-            AutoAttributeManager.AutoReference(x.gameObject);
-            AutoAttributeManager.AutoReferenceAllChildren(x.gameObject);
-
-            var d = x.transform.Find("PPlayer/RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.AddComponent<DamageDealer>();
-            Traverse.Create(d).Field("_parriableOwner").SetValue(MonsterManager.Instance.monsterDict.First().Value);
-            d.type = DamageType.MonsterAttack;
-            Traverse.Create(d).Field("_parriableOwner").SetValue(MonsterManager.Instance.monsterDict.First().Value);
-            d.bindingParry = MonsterManager.Instance.monsterDict.First().Value.GetComponentInChildren<ParriableAttackEffect>();
-            //d.attacker = x.transform.Find("PPlayer").GetComponent<Player>().health;
-            d.attacker = MonsterManager.Instance.monsterDict.First().Value.GetComponentInChildren<Health>();
-            d.damageAmount = x.transform.Find("PPlayer/RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>().FinalValue;
-
-            Traverse.Create(x.transform.Find("PPlayer/RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("valueProvider").SetValue(d);
-            Traverse.Create(x.transform.Find("PPlayer/RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("fxTimingOverrider").SetValue(d);
-
-            var customDealersField = Traverse.Create(x.transform.Find("PPlayer/RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("customDealers");
-            var newDealersArray = new List<DamageDealer> { d };
-            // Set the new array back to the customDealers field.
-            customDealersField.SetValue(newDealersArray.ToArray());
-
-            effectReceiver = x.transform
-                        .Find("PPlayer/RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")
-                        .GetComponent<EffectReceiver>();
-
-            if (effectReceiver != null) {
-                effectReceiver.effectType = EffectType.EnemyAttack |
-                                            EffectType.BreakableBreaker |
-                                            EffectType.ShieldBreak |
-                                            EffectType.PostureDecreaseEffect;
-            }
-
             var p = Player.i.gameObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.AddComponent<DamageDealer>();
-            Traverse.Create(p).Field("_parriableOwner").SetValue(MonsterManager.Instance.monsterDict.First().Value);
             p.type = DamageType.MonsterAttack;
             Traverse.Create(p).Field("_parriableOwner").SetValue(MonsterManager.Instance.monsterDict.First().Value);
             p.bindingParry = MonsterManager.Instance.monsterDict.First().Value.GetComponentInChildren<ParriableAttackEffect>();
@@ -174,6 +154,103 @@ namespace Multiplayer {
             var n = new List<DamageDealer> { p };
             // Set the new array back to the customDealers field.
             c.SetValue(n.ToArray());
+
+            var dummy = Instantiate(
+                Player.i.transform.Find("RotateProxy/SpriteHolder").gameObject,
+                Player.i.transform.position,
+                Quaternion.identity
+            );
+
+            var pp = dummy.transform.Find("HitBoxManager/AttackFront").gameObject.AddComponent<DamageDealer>();
+            pp.type = DamageType.MonsterAttack;
+            Traverse.Create(pp).Field("_parriableOwner").SetValue(MonsterManager.Instance.monsterDict.First().Value);
+            pp.bindingParry = MonsterManager.Instance.monsterDict.First().Value.GetComponentInChildren<ParriableAttackEffect>();
+            pp.attacker = MonsterManager.Instance.monsterDict.First().Value.health;
+            pp.damageAmount = dummy.transform.Find("HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>().FinalValue;
+
+            Traverse.Create(dummy.transform.Find("HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("valueProvider").SetValue(p);
+            Traverse.Create(dummy.transform.Find("HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("fxTimingOverrider").SetValue(p);
+
+            var cc = Traverse.Create(dummy.transform.Find("HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("customDealers");
+            var nn = new List<DamageDealer> { pp };
+            cc.SetValue(nn.ToArray());
+
+            var e = dummy.transform
+                        .Find("Health(Don'tKey)/DamageReceiver")
+                        .GetComponent<EffectReceiver>();
+
+            ToastManager.Toast(e);
+            if (e != null) {
+                e.effectType = EffectType.EnemyAttack |
+                                            EffectType.BreakableBreaker |
+                                            EffectType.ShieldBreak |
+                                            EffectType.PostureDecreaseEffect;
+            }
+
+            AutoAttributeManager.AutoReference(dummy);
+            AutoAttributeManager.AutoReferenceAllChildren(dummy);
+            //Player.i.Suicide();
+            //var x = Instantiate(Resources.Load<GameObject>("Global Prefabs/GameCore").transform.Find("RCG LifeCycle"));
+            //x.transform.Find("PPlayer").transform.position = Player.i.transform.position;
+
+            //var effectReceiver = Player.i.transform
+            //            .Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")
+            //            .GetComponent<EffectReceiver>();
+
+            //ToastManager.Toast(effectReceiver);
+            //if (effectReceiver != null) {
+            //    effectReceiver.effectType = EffectType.EnemyAttack |
+            //                                EffectType.BreakableBreaker |
+            //                                EffectType.ShieldBreak |
+            //                                EffectType.PostureDecreaseEffect;
+            //}
+
+            //AutoAttributeManager.AutoReference(x.gameObject);
+            //AutoAttributeManager.AutoReferenceAllChildren(x.gameObject);
+
+            //var d = x.transform.Find("PPlayer/RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.AddComponent<DamageDealer>();
+            //Traverse.Create(d).Field("_parriableOwner").SetValue(MonsterManager.Instance.monsterDict.First().Value);
+            //d.type = DamageType.MonsterAttack;
+            //Traverse.Create(d).Field("_parriableOwner").SetValue(MonsterManager.Instance.monsterDict.First().Value);
+            //d.bindingParry = MonsterManager.Instance.monsterDict.First().Value.GetComponentInChildren<ParriableAttackEffect>();
+            ////d.attacker = x.transform.Find("PPlayer").GetComponent<Player>().health;
+            //d.attacker = MonsterManager.Instance.monsterDict.First().Value.GetComponentInChildren<Health>();
+            //d.damageAmount = x.transform.Find("PPlayer/RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>().FinalValue;
+
+            //Traverse.Create(x.transform.Find("PPlayer/RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("valueProvider").SetValue(d);
+            //Traverse.Create(x.transform.Find("PPlayer/RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("fxTimingOverrider").SetValue(d);
+
+            //var customDealersField = Traverse.Create(x.transform.Find("PPlayer/RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("customDealers");
+            //var newDealersArray = new List<DamageDealer> { d };
+            //// Set the new array back to the customDealers field.
+            //customDealersField.SetValue(newDealersArray.ToArray());
+
+            //effectReceiver = x.transform
+            //            .Find("PPlayer/RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")
+            //            .GetComponent<EffectReceiver>();
+
+            //if (effectReceiver != null) {
+            //    effectReceiver.effectType = EffectType.EnemyAttack |
+            //                                EffectType.BreakableBreaker |
+            //                                EffectType.ShieldBreak |
+            //                                EffectType.PostureDecreaseEffect;
+            //}
+
+            //var p = Player.i.gameObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.AddComponent<DamageDealer>();
+            //Traverse.Create(p).Field("_parriableOwner").SetValue(MonsterManager.Instance.monsterDict.First().Value);
+            //p.type = DamageType.MonsterAttack;
+            //Traverse.Create(p).Field("_parriableOwner").SetValue(MonsterManager.Instance.monsterDict.First().Value);
+            //p.bindingParry = MonsterManager.Instance.monsterDict.First().Value.GetComponentInChildren<ParriableAttackEffect>();
+            //p.attacker = Player.i.health;
+            //p.damageAmount = Player.i.gameObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>().FinalValue;
+
+            //Traverse.Create(Player.i.gameObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("valueProvider").SetValue(p);
+            //Traverse.Create(Player.i.gameObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("fxTimingOverrider").SetValue(p);
+
+            //var c = Traverse.Create(Player.i.gameObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("customDealers");
+            //var n = new List<DamageDealer> { p };
+            //// Set the new array back to the customDealers field.
+            //c.SetValue(n.ToArray());
 
             //if (SceneManager.GetActiveScene().name == "TitleScreenMenu" && StartMenuLogic.Instance != null) {
 
@@ -410,8 +487,36 @@ namespace Multiplayer {
                 Quaternion.identity
             );
 
-            AutoAttributeManager.AutoReference(playerObject);
-            AutoAttributeManager.AutoReferenceAllChildren(playerObject);
+            
+            var pp = playerObject.transform.Find("HitBoxManager/AttackFront").gameObject.AddComponent<DamageDealer>();
+            pp.type = DamageType.MonsterAttack;
+            Traverse.Create(pp).Field("_parriableOwner").SetValue(GameObject.Find("A1_S2_GameLevel/Room/Prefab/Gameplay5/[自然巡邏框架]/[MonsterBehaviorProvider] LevelDesign_CullingAndResetGroup/[MonsterBehaviorProvider] LevelDesign_Init_Scenario (看守的人)/StealthGameMonster_Spearman (1)").GetComponent<StealthGameMonster>());
+            pp.bindingParry = GameObject.Find("A1_S2_GameLevel/Room/Prefab/Gameplay5/[自然巡邏框架]/[MonsterBehaviorProvider] LevelDesign_CullingAndResetGroup/[MonsterBehaviorProvider] LevelDesign_Init_Scenario (看守的人)/StealthGameMonster_Spearman (1)/MonsterCore/Animator(Proxy)/Animator/LogicRoot/SwordSlashEffect/DamageArea").GetComponent<DamageDealer>().bindingParry;
+            pp.attacker = GameObject.Find("A1_S2_GameLevel/Room/Prefab/Gameplay5/[自然巡邏框架]/[MonsterBehaviorProvider] LevelDesign_CullingAndResetGroup/[MonsterBehaviorProvider] LevelDesign_Init_Scenario (看守的人)/StealthGameMonster_Spearman (1)").GetComponent<StealthGameMonster>().health;
+            pp.damageAmount = playerObject.transform.Find("HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>().FinalValue;
+
+            Traverse.Create(playerObject.transform.Find("HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("valueProvider").SetValue(pp);
+            Traverse.Create(playerObject.transform.Find("HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("fxTimingOverrider").SetValue(pp);
+            playerObject.transform.Find("HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>().owner = new Player();
+            playerObject.transform.Find("HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>().DealerEffectOwner = new Player();
+
+            var cc = Traverse.Create(playerObject.transform.Find("HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("customDealers");
+            var nn = new List<DamageDealer> { pp };
+            cc.SetValue(nn.ToArray());
+
+            var e = playerObject.transform
+                        .Find("Health(Don'tKey)/DamageReceiver")
+                        .GetComponent<EffectReceiver>();
+
+            ToastManager.Toast(e);
+            if (e != null) {
+                e.effectType = EffectType.EnemyAttack |
+                                            EffectType.BreakableBreaker |
+                                            EffectType.ShieldBreak |
+                                            EffectType.PostureDecreaseEffect;
+            }
+
+
 
             //var effectReceiver = Player.i.transform
             //    .Find("Health(Don'tKey)/DamageReceiver")
@@ -424,15 +529,15 @@ namespace Multiplayer {
             //}
 
             // Update effect type on the EffectReceiver component
-            var effectReceiver = playerObject.transform
-                .Find("Health(Don'tKey)/DamageReceiver")
-                .GetComponent<EffectReceiver>();
-            if (effectReceiver != null) {
-                effectReceiver.effectType &= ~(EffectType.EnemyAttack |
-                                            EffectType.BreakableBreaker |
-                                            EffectType.ShieldBreak |
-                                            EffectType.PostureDecreaseEffect);
-            }
+            //var effectReceiver = playerObject.transform
+            //    .Find("Health(Don'tKey)/DamageReceiver")
+            //    .GetComponent<EffectReceiver>();
+            //if (effectReceiver != null) {
+            //    effectReceiver.effectType &= ~(EffectType.EnemyAttack |
+            //                                EffectType.BreakableBreaker |
+            //                                EffectType.ShieldBreak |
+            //                                EffectType.PostureDecreaseEffect);
+            //}
 
             //// Disable all AbilityActivateChecker components
             //foreach (var abilityChecker in playerObject.GetComponentsInChildren<AbilityActivateChecker>(true)) {
