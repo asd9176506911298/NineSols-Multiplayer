@@ -8,6 +8,7 @@ using NineSolsAPI.Menu;
 using NineSolsAPI.Utils;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -62,6 +63,7 @@ namespace Multiplayer {
 #if DEBUG
                 KeybindManager.Add(this, ConnectToServer, () => new KeyboardShortcut(KeyCode.S,KeyCode.LeftControl));
                 KeybindManager.Add(this, DisconnectFromServer, () => new KeyboardShortcut(KeyCode.Q,KeyCode.LeftControl));
+                KeybindManager.Add(this, StartMemoryChallenge, () => new KeyboardShortcut(KeyCode.Z));
                 KeybindManager.Add(this, test, () => new KeyboardShortcut(KeyCode.H, KeyCode.LeftControl));
                 ip.Value = "127.0.0.1";
 #endif
@@ -77,13 +79,122 @@ namespace Multiplayer {
             Log.Info("Multiplayer plugin initialized.");
         }
 #if DEBUG
+        public static T CopyComponent<T>(T source, GameObject target) where T : Component {
+            if (source == null || target == null)
+                return null;
+
+            // Add the same type of component to the target
+            T targetComponent = target.AddComponent<T>();
+
+            // Copy all fields from the source to the target
+            System.Type type = typeof(T);
+            var fields = type.GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+            foreach (var field in fields) {
+                field.SetValue(targetComponent, field.GetValue(source));
+            }
+
+            // Copy all properties that are not read-only
+            var properties = type.GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            foreach (var property in properties) {
+                if (property.CanWrite && property.GetSetMethod(true) != null) {
+                    try {
+                        property.SetValue(targetComponent, property.GetValue(source));
+                    } catch {
+                        // Handle exceptions if needed (e.g., some properties are not accessible or valid)
+                    }
+                }
+            }
+
+            return targetComponent;
+        }
+
         void test() {
             ToastManager.Toast("test");
-            foreach(var x in Resources.FindObjectsOfTypeAll<ParriableAttackEffect>()) {
-                ToastManager.Toast(GetGameObjectPath(x.gameObject));
+
+            //Player.i.Suicide();
+            var x = Instantiate(Resources.Load<GameObject>("Global Prefabs/GameCore").transform.Find("RCG LifeCycle"));
+            x.transform.Find("PPlayer").transform.position = Player.i.transform.position;
+
+            var effectReceiver = Player.i.transform
+                        .Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")
+                        .GetComponent<EffectReceiver>();
+
+            ToastManager.Toast(effectReceiver);
+            if (effectReceiver != null) {
+                effectReceiver.effectType = EffectType.EnemyAttack |
+                                            EffectType.BreakableBreaker |
+                                            EffectType.ShieldBreak |
+                                            EffectType.PostureDecreaseEffect;
             }
+
+            AutoAttributeManager.AutoReference(x.gameObject);
+            AutoAttributeManager.AutoReferenceAllChildren(x.gameObject);
+
+            var d = x.transform.Find("PPlayer/RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.AddComponent<DamageDealer>();
+            Traverse.Create(d).Field("_parriableOwner").SetValue(MonsterManager.Instance.monsterDict.First().Value);
+            d.type = DamageType.MonsterAttack;
+            Traverse.Create(d).Field("_parriableOwner").SetValue(MonsterManager.Instance.monsterDict.First().Value);
+            d.bindingParry = MonsterManager.Instance.monsterDict.First().Value.GetComponentInChildren<ParriableAttackEffect>();
+            d.attacker = x.transform.Find("PPlayer").GetComponent<Player>().health;
+            d.damageAmount = 30f;
+
+            Traverse.Create(x.transform.Find("PPlayer/RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("valueProvider").SetValue(d);
+            Traverse.Create(x.transform.Find("PPlayer/RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("fxTimingOverrider").SetValue(d);
+
+            var customDealersField = Traverse.Create(x.transform.Find("PPlayer/RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("customDealers");
+            var newDealersArray = new List<DamageDealer> { d };
+            // Set the new array back to the customDealers field.
+            customDealersField.SetValue(newDealersArray.ToArray());
+
+            effectReceiver = x.transform
+                        .Find("PPlayer/RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")
+                        .GetComponent<EffectReceiver>();
+
+            if (effectReceiver != null) {
+                effectReceiver.effectType = EffectType.EnemyAttack |
+                                            EffectType.BreakableBreaker |
+                                            EffectType.ShieldBreak |
+                                            EffectType.PostureDecreaseEffect;
+            }
+
+            var p = Player.i.gameObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.AddComponent<DamageDealer>();
+            Traverse.Create(p).Field("_parriableOwner").SetValue(MonsterManager.Instance.monsterDict.First().Value);
+            p.type = DamageType.MonsterAttack;
+            Traverse.Create(p).Field("_parriableOwner").SetValue(MonsterManager.Instance.monsterDict.First().Value);
+            p.bindingParry = MonsterManager.Instance.monsterDict.First().Value.GetComponentInChildren<ParriableAttackEffect>();
+            p.attacker = Player.i.health;
+            p.damageAmount = 30f;
+
+            Traverse.Create(Player.i.gameObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("valueProvider").SetValue(p);
+            Traverse.Create(Player.i.gameObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("fxTimingOverrider").SetValue(p);
+
+            var c = Traverse.Create(Player.i.gameObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("customDealers");
+            var n = new List<DamageDealer> { p };
+            // Set the new array back to the customDealers field.
+            c.SetValue(n.ToArray());
+
+            //if (SceneManager.GetActiveScene().name == "TitleScreenMenu" && StartMenuLogic.Instance != null) {
+
+            //    var StartMemoryChallenge = typeof(StartMenuLogic).GetMethod("StartMemoryChallenge");
+            //    if (StartMemoryChallenge != null)
+            //        StartMemoryChallenge.Invoke(StartMenuLogic.Instance, new object[] { });
+            //}
+
+            //foreach(var x in Resources.FindObjectsOfTypeAll<ParriableAttackEffect>()) {
+            //    ToastManager.Toast(GetGameObjectPath(x.gameObject));
+            //}
             //var x = Instantiate(Resources.Load<GameObject>("Global Prefabs/GameCore").GetComponent<GameCore>().transform.Find("RCG LifeCycle").gameObject, Player.i.transform.position, Quaternion.identity);
             //Player.i.ChangeState(PlayerStateType.Parry);
+        }
+
+        void StartMemoryChallenge() {
+            if (SceneManager.GetActiveScene().name == "TitleScreenMenu" && StartMenuLogic.Instance != null) {
+                ToastManager.Toast("StartMemoryChallenge");
+                var StartMemoryChallenge = typeof(StartMenuLogic).GetMethod("StartMemoryChallenge");
+                if (StartMemoryChallenge != null)
+                    StartMemoryChallenge.Invoke(StartMenuLogic.Instance, new object[] { });
+            }
         }
 
         string GetGameObjectPath(GameObject obj) {
@@ -124,6 +235,16 @@ namespace Multiplayer {
             _client.Connect(ip.Value, port.Value, "SomeConnectionKey");
             _localPlayerId = -1;
             ClearPlayerObjects();
+
+            var effectReceiver = Player.i.transform
+                        .Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")
+                        .GetComponent<EffectReceiver>();
+            if (effectReceiver != null) {
+                effectReceiver.effectType = EffectType.EnemyAttack |
+                                            EffectType.BreakableBreaker |
+                                            EffectType.ShieldBreak |
+                                            EffectType.PostureDecreaseEffect;
+            }
         }
 
         private async void DisconnectFromServer() {
@@ -254,6 +375,7 @@ namespace Multiplayer {
             if (_localPlayerId == playerId) return;
 
             if (!_playerObjects.TryGetValue(playerId, out var playerData)) {
+                ToastManager.Toast(playerId);
                 playerData = CreatePlayerObject(playerId, position);
                 _playerObjects[playerId] = playerData;
             }
@@ -290,22 +412,31 @@ namespace Multiplayer {
             AutoAttributeManager.AutoReference(playerObject);
             AutoAttributeManager.AutoReferenceAllChildren(playerObject);
 
+            //var effectReceiver = Player.i.transform
+            //    .Find("Health(Don'tKey)/DamageReceiver")
+            //    .GetComponent<EffectReceiver>();
+            //if (effectReceiver != null) {
+            //    effectReceiver.effectType = EffectType.EnemyAttack |
+            //                                EffectType.BreakableBreaker |
+            //                                EffectType.ShieldBreak |
+            //                                EffectType.PostureDecreaseEffect;
+            //}
 
             // Update effect type on the EffectReceiver component
             var effectReceiver = playerObject.transform
                 .Find("Health(Don'tKey)/DamageReceiver")
                 .GetComponent<EffectReceiver>();
             if (effectReceiver != null) {
-                effectReceiver.effectType = EffectType.EnemyAttack |
+                effectReceiver.effectType &= ~(EffectType.EnemyAttack |
                                             EffectType.BreakableBreaker |
                                             EffectType.ShieldBreak |
-                                            EffectType.PostureDecreaseEffect;
+                                            EffectType.PostureDecreaseEffect);
             }
 
-            // Disable all AbilityActivateChecker components
-            foreach (var abilityChecker in playerObject.GetComponentsInChildren<AbilityActivateChecker>(true)) {
-                abilityChecker.enabled = false;
-            }
+            //// Disable all AbilityActivateChecker components
+            //foreach (var abilityChecker in playerObject.GetComponentsInChildren<AbilityActivateChecker>(true)) {
+            //    abilityChecker.enabled = false;
+            //}
 
             // Set player object name
             playerObject.name = $"PlayerObject_{playerId}";
