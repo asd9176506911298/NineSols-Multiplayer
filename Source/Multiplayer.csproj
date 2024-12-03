@@ -46,6 +46,9 @@
       <Reference Include="barbaro.autoattributes.Runtime">
         <HintPath>$(NineSolsPath)/NineSols_Data/Managed/barbaro.autoattributes.Runtime.dll</HintPath>
       </Reference>
+      <Reference Include="Sirenix.OdinInspector.Attributes">
+        <HintPath>$(NineSolsPath)/NineSols_Data/Managed/Sirenix.OdinInspector.Attributes.dll</HintPath>
+      </Reference>
         <Reference Include="LiteNetLib">
           <HintPath>lib\LiteNetLib.dll</HintPath>
         </Reference>
