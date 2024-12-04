@@ -9,4 +9,5 @@ class PlayerData {
     public string AnimationState { get; set; }
     public bool isFacingRight { get; set; }
     public string name { get; set; }
+    public string scene { get; set; }
 }

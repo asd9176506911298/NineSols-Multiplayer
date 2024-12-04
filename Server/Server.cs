@@ -138,6 +138,10 @@ namespace Server {
                     var namee = reader.GetString();
                     BroadcastSystemMessage($"{namee} disconnected. Player Count:{_server.ConnectedPeersCount}", peer);
                     break;
+                case "Scene":
+                    var scene = reader.GetString();
+                    _players[peer.Id].scene = scene;
+                    break;
                 default:
                     Console.WriteLine($"Unknown message type: {messageType}");
                     break;
@@ -232,6 +236,7 @@ namespace Server {
                     _writer.Put(player.z);
                     _writer.Put(player.AnimationState);
                     _writer.Put(player.isFacingRight);
+                    _writer.Put(player.scene);
                     peer.Send(_writer, DeliveryMethod.Unreliable);
                 }
             }

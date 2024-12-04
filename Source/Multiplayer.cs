@@ -6,11 +6,13 @@ using LiteNetLib;
 using LiteNetLib.Utils;
 using NineSolsAPI;
 using NineSolsAPI.Menu;
+using NineSolsAPI.Preload;
 using NineSolsAPI.Utils;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -111,13 +113,18 @@ namespace Multiplayer {
 
             return targetComponent;
         }
+
+        public GameObject preloadedObject; // This will hold the preloaded GameObject after loading
+
         void test2() {
             // Array of player object names
-            ToastManager.Toast(Player.i.transform.Find("RotateProxy/SpriteHolder/HitBoxManager"));
-            var x = Player.i.transform.Find("RotateProxy/SpriteHolder/HitBoxManager").transform;
-            for(int i = 0; i < x.childCount; i++) {
-                ToastManager.Toast(x.GetChild(i).name);
-            }
+            ToastManager.Toast("test");
+
+            //ToastManager.Toast(Player.i.transform.Find("RotateProxy/SpriteHolder/HitBoxManager"));
+            //var x = Player.i.transform.Find("RotateProxy/SpriteHolder/HitBoxManager").transform;
+            //for(int i = 0; i < x.childCount; i++) {
+            //    ToastManager.Toast(x.GetChild(i).name);
+            //}
             //GameObject.Find("PlayerObject_0/RotateProxy/SpriteHolder").transform.SetParent(null);
             //Destroy(GameObject.Find("PlayerObject_0"));
             //string[] playerObjectNames = { "PlayerObject_0", "PlayerObject_1", "PlayerObject_2", "PlayerObject_3" };
@@ -311,6 +318,11 @@ namespace Multiplayer {
                 // Start a coroutine to wait for 3 seconds before clearing player objects
                 StartCoroutine(WaitAndClearPlayerObjects(scene));
             }
+
+            _dataWriter.Reset();
+            _dataWriter.Put("Scene");
+            _dataWriter.Put(SceneManager.GetActiveScene().name);
+            _client.FirstPeer.Send(_dataWriter, DeliveryMethod.ReliableOrdered);
         }
 
         private IEnumerator WaitAndClearPlayerObjects(Scene scene) {
@@ -443,6 +455,11 @@ namespace Multiplayer {
                     _dataWriter.Put(playerName.Value);
                     _client.FirstPeer.Send(_dataWriter, DeliveryMethod.Unreliable);
                     //ToastManager.Toast($"Assigned Player ID: {_localPlayerId}");
+
+                    _dataWriter.Reset();
+                    _dataWriter.Put("Scene");
+                    _dataWriter.Put(SceneManager.GetActiveScene().name);
+                    _client.FirstPeer.Send(_dataWriter, DeliveryMethod.ReliableOrdered);
                     break;
                 case "DecreaseHealth":
                     HandleDecreaseHealth(reader);
@@ -471,6 +488,9 @@ namespace Multiplayer {
             var position = new Vector3(reader.GetFloat(), reader.GetFloat(), reader.GetFloat());
             var animationState = reader.GetString();
             var isFacingRight = reader.GetBool();
+            var scene = reader.GetString();
+
+            ToastManager.Toast(scene);
 
             if (_localPlayerId == playerId) return;
 
@@ -588,7 +608,7 @@ namespace Multiplayer {
             AutoAttributeManager.AutoReference(playerObject);
             AutoAttributeManager.AutoReferenceAllChildren(playerObject);
 
-            makeDamage(playerObject, dp);
+            //makeDamage(playerObject, dp);
 
             //var pp = playerObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.AddComponent<DamageDealer>();
             //pp.type = DamageType.MonsterAttack;
