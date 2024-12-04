@@ -502,46 +502,77 @@ namespace Multiplayer {
             }
         }
 
-        void makeDamage(GameObject playerObject,Player dp) {
-            var x = Player.i.transform.Find("RotateProxy/SpriteHolder/HitBoxManager").transform;
-            for (int i = 0; i < x.childCount; i++) {
-                ToastManager.Toast(x.GetChild(i).name);
+        void makeDamage(GameObject playerObject, Player dp) {
+            var hitBoxManager = Player.i.transform.Find("RotateProxy/SpriteHolder/HitBoxManager")?.transform;
 
+            if (hitBoxManager == null) {
+                ToastManager.Toast("HitBoxManager not found.");
+                return;
+            }
 
-                var name = x.GetChild(i).name;
-                var pp = playerObject.transform.Find($"RotateProxy/SpriteHolder/HitBoxManager/{name}").gameObject.AddComponent<DamageDealer>();
-                pp.type = DamageType.MonsterAttack;
-                Traverse.Create(pp).Field("_parriableOwner").SetValue(GameObject.Find("A1_S2_GameLevel/Room/Prefab/Gameplay5/[自然巡邏框架]/[MonsterBehaviorProvider] LevelDesign_CullingAndResetGroup/[MonsterBehaviorProvider] LevelDesign_Init_Scenario (看守的人)/StealthGameMonster_Spearman (1)").GetComponent<StealthGameMonster>());
-                Traverse.Create(pp).Field("owner").SetValue(GameObject.Find("A1_S2_GameLevel/Room/Prefab/Gameplay5/[自然巡邏框架]/[MonsterBehaviorProvider] LevelDesign_CullingAndResetGroup/[MonsterBehaviorProvider] LevelDesign_Init_Scenario (看守的人)/StealthGameMonster_Spearman (1)").GetComponent<StealthGameMonster>());
-                pp.bindingParry = GameObject.Find("A1_S2_GameLevel/Room/Prefab/Gameplay5/[自然巡邏框架]/[MonsterBehaviorProvider] LevelDesign_CullingAndResetGroup/[MonsterBehaviorProvider] LevelDesign_Init_Scenario (看守的人)/StealthGameMonster_Spearman (1)/MonsterCore/Animator(Proxy)/Animator/LogicRoot/SwordSlashEffect/DamageArea").GetComponent<DamageDealer>().bindingParry;
-                pp.attacker = GameObject.Find("A1_S2_GameLevel/Room/Prefab/Gameplay5/[自然巡邏框架]/[MonsterBehaviorProvider] LevelDesign_CullingAndResetGroup/[MonsterBehaviorProvider] LevelDesign_Init_Scenario (看守的人)/StealthGameMonster_Spearman (1)").GetComponent<StealthGameMonster>().health;
-                pp.damageAmount = playerObject.transform.Find($"RotateProxy/SpriteHolder/HitBoxManager/{name}").gameObject.GetComponent<EffectDealer>().FinalValue;
+            var monsterPath = "A1_S2_GameLevel/Room/Prefab/Gameplay5/[自然巡邏框架]/[MonsterBehaviorProvider] LevelDesign_CullingAndResetGroup/[MonsterBehaviorProvider] LevelDesign_Init_Scenario (看守的人)/StealthGameMonster_Spearman (1)";
+            var monsterCorePath = $"{monsterPath}/MonsterCore/Animator(Proxy)/Animator/LogicRoot/SwordSlashEffect/DamageArea";
 
-                Traverse.Create(playerObject.transform.Find($"RotateProxy/SpriteHolder/HitBoxManager/{name}").gameObject.GetComponent<EffectDealer>()).Field("valueProvider").SetValue(pp);
-                Traverse.Create(playerObject.transform.Find($"RotateProxy/SpriteHolder/HitBoxManager/{name}").gameObject.GetComponent<EffectDealer>()).Field("fxTimingOverrider").SetValue(pp);
-                playerObject.transform.Find($"RotateProxy/SpriteHolder/HitBoxManager/{name}").gameObject.GetComponent<EffectDealer>().owner = dp;
-                playerObject.transform.Find($"RotateProxy/SpriteHolder/HitBoxManager/{name}").gameObject.GetComponent<EffectDealer>().DealerEffectOwner = dp;
+            var monster = GameObject.Find(monsterPath)?.GetComponent<StealthGameMonster>();
+            var bindingParry = GameObject.Find(monsterCorePath)?.GetComponent<DamageDealer>()?.bindingParry;
 
-                playerObject.transform.Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver").gameObject.GetComponent<EffectReceiver>().Owner = dp;
-                ToastManager.Toast(playerObject.transform.Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver"));
+            if (monster == null || bindingParry == null) {
+                ToastManager.Toast("Monster or binding parry not found.");
+                return;
+            }
 
-                var cc = Traverse.Create(playerObject.transform.Find($"RotateProxy/SpriteHolder/HitBoxManager/{name}").gameObject.GetComponent<EffectDealer>()).Field("customDealers");
-                var nn = new List<DamageDealer> { pp };
-                cc.SetValue(nn.ToArray());
+            for (int i = 0; i < hitBoxManager.childCount; i++) {
+                var child = hitBoxManager.GetChild(i);
+                var name = child.name;
+                ToastManager.Toast(name);
 
-                var e = playerObject.transform
-                            .Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")
-                            .GetComponent<EffectReceiver>();
+                var hitBoxPath = $"RotateProxy/SpriteHolder/HitBoxManager/{name}";
+                var effectDealer = playerObject.transform.Find(hitBoxPath)?.GetComponent<EffectDealer>();
 
-                ToastManager.Toast(e);
-                if (e != null) {
-                    e.effectType &= EffectType.EnemyAttack |
-                                                EffectType.BreakableBreaker |
-                                                EffectType.ShieldBreak |
-                                                EffectType.PostureDecreaseEffect;
+                if (effectDealer == null) {
+                    ToastManager.Toast($"EffectDealer not found for {name}");
+                    continue;
                 }
+
+                // Add and configure DamageDealer
+                var damageDealer = playerObject.transform.Find(hitBoxPath)?.gameObject.AddComponent<DamageDealer>();
+                if (damageDealer != null) {
+                    damageDealer.type = DamageType.MonsterAttack;
+                    damageDealer.bindingParry = bindingParry;
+                    damageDealer.attacker = monster.health;
+                    damageDealer.damageAmount = effectDealer.FinalValue;
+
+                    Traverse.Create(damageDealer).Field("_parriableOwner").SetValue(monster);
+                    Traverse.Create(damageDealer).Field("owner").SetValue(monster);
+                }
+
+                // Update EffectDealer
+                Traverse.Create(effectDealer).Field("valueProvider").SetValue(damageDealer);
+                Traverse.Create(effectDealer).Field("fxTimingOverrider").SetValue(damageDealer);
+                effectDealer.owner = dp;
+                effectDealer.DealerEffectOwner = dp;
+
+                // Update EffectReceiver
+                var effectReceiver = playerObject.transform
+                    .Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")
+                    ?.GetComponent<EffectReceiver>();
+
+                if (effectReceiver != null) {
+                    effectReceiver.Owner = dp;
+                    effectReceiver.effectType = EffectType.EnemyAttack |
+                                                  EffectType.BreakableBreaker |
+                                                  EffectType.ShieldBreak |
+                                                  EffectType.PostureDecreaseEffect;
+                } else {
+                    ToastManager.Toast("EffectReceiver not found.");
+                }
+
+                // Set customDealers field
+                var customDealers = new List<DamageDealer> { damageDealer };
+                Traverse.Create(effectDealer).Field("customDealers").SetValue(customDealers.ToArray());
             }
         }
+
 
         private PlayerData CreatePlayerObject(int playerId, Vector3 position) {
             // Instantiate the player object
