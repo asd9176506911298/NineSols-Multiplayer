@@ -490,18 +490,30 @@ namespace Multiplayer {
             var isFacingRight = reader.GetBool();
             var scene = reader.GetString();
 
-            ToastManager.Toast(scene);
-
+            // Ignore updates for the local player
             if (_localPlayerId == playerId) return;
 
+            // Check if the player is in a different scene
+            if (scene != SceneManager.GetActiveScene().name) {
+                // If the player exists in the current scene, destroy their object and remove them
+                if (_playerObjects.TryGetValue(playerId, out var p)) {
+                    Destroy(p.PlayerObject);
+                    _playerObjects.Remove(playerId);
+                }
+                return;
+            }
+
+            // If the player object doesn't exist, create it
             if (!_playerObjects.TryGetValue(playerId, out var playerData)) {
-                ToastManager.Toast(playerId);
+                ToastManager.Toast(playerId); // Notify that a new player object is being created
                 playerData = CreatePlayerObject(playerId, position);
                 _playerObjects[playerId] = playerData;
             }
 
+            // Update the player's object properties
             UpdatePlayerObject(playerData, position, animationState, isFacingRight);
         }
+
 
         private void HandleDecreaseHealth(NetDataReader reader) {
             ToastManager.Toast("HandleDecreaseHealth");
