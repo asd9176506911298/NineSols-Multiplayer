@@ -1,4 +1,5 @@
-﻿using BepInEx;
+﻿using Auto.Utils;
+using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
 using LiteNetLib;
@@ -111,18 +112,20 @@ namespace Multiplayer {
         }
         void test2() {
             // Array of player object names
-            string[] playerObjectNames = { "PlayerObject_0", "PlayerObject_1", "PlayerObject_2", "PlayerObject_3" };
+            GameObject.Find("PlayerObject_0/RotateProxy/SpriteHolder").transform.SetParent(null);
+            Destroy(GameObject.Find("PlayerObject_0"));
+            //string[] playerObjectNames = { "PlayerObject_0", "PlayerObject_1", "PlayerObject_2", "PlayerObject_3" };
 
-            // Loop through each player object
-            foreach (string playerName in playerObjectNames) {
-                GameObject playerObject = GameObject.Find(playerName);
-                if (playerObject != null) {
-                    Animator animator = playerObject.GetComponent<Animator>();
-                    if (animator != null) {
-                        animator.PlayInFixedTime("Attack1", 0, 0f);
-                    }
-                }
-            }
+            //// Loop through each player object
+            //foreach (string playerName in playerObjectNames) {
+            //    GameObject playerObject = GameObject.Find(playerName);
+            //    if (playerObject != null) {
+            //        Animator animator = playerObject.GetComponent<Animator>();
+            //        if (animator != null) {
+            //            animator.PlayInFixedTime("Attack1", 0, 0f);
+            //        }
+            //    }
+            //}
 
         }
         void test() {
@@ -487,7 +490,7 @@ namespace Multiplayer {
                 Quaternion.identity
             );
 
-            playerObject.GetComponent<Player>();
+            playerObject.GetComponent<Player>().enabled = false; ;
 
             AutoAttributeManager.AutoReference(playerObject);
             AutoAttributeManager.AutoReferenceAllChildren(playerObject);
@@ -575,12 +578,13 @@ namespace Multiplayer {
 
             if (animator.GetCurrentAnimatorStateInfo(0).IsName(animationState) &&
                 animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1f) {
-                animator.Play(animationState, 0, 0f);
+                animator.PlayInFixedTime(animationState, 0, 0f);
             }
 
-            var scale = playerObject.transform.localScale;
-            scale.x = Mathf.Abs(scale.x) * (isFacingRight ? 1 : -1);
-            playerObject.transform.localScale = scale;
+            playerData.PlayerObject.GetComponent<Player>().Facing = isFacingRight ? Facings.Right : Facings.Left;
+            //var scale = playerObject.transform.localScale;
+            //scale.x = Mathf.Abs(scale.x) * (isFacingRight ? 1 : -1);
+            //playerObject.transform.localScale = scale;
         }
 
         private void OnDestroy() {
