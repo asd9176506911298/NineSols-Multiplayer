@@ -571,7 +571,7 @@ namespace Multiplayer {
                 if (damageDealer != null) {
                     damageDealer.type = DamageType.MonsterAttack;
                     damageDealer.bindingParry = bindingParry;
-                    damageDealer.attacker = monster.health;
+                    damageDealer.attacker = new Health();
                     damageDealer.damageAmount = effectDealer.FinalValue;
 
                     Traverse.Create(damageDealer).Field("_parriableOwner").SetValue(monster);
