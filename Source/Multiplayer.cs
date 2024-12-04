@@ -120,6 +120,14 @@ namespace Multiplayer {
             // Array of player object names
             ToastManager.Toast("test");
 
+            foreach (var gameObject in Resources.FindObjectsOfTypeAll<GameObject>()) {
+                var monsterBases = gameObject.GetComponentsInChildren<DamageDealer>(true);
+                foreach (var monster in monsterBases) {
+                    ToastManager.Toast(GetGameObjectPath(monster.gameObject));
+                }
+            }
+
+
             //ToastManager.Toast(Player.i.transform.Find("RotateProxy/SpriteHolder/HitBoxManager"));
             //var x = Player.i.transform.Find("RotateProxy/SpriteHolder/HitBoxManager").transform;
             //for(int i = 0; i < x.childCount; i++) {
@@ -571,7 +579,7 @@ namespace Multiplayer {
                 if (damageDealer != null) {
                     damageDealer.type = DamageType.MonsterAttack;
                     damageDealer.bindingParry = bindingParry;
-                    damageDealer.attacker = new Health();
+                    damageDealer.attacker = new Health(); //monster.health;
                     damageDealer.damageAmount = effectDealer.FinalValue;
 
                     Traverse.Create(damageDealer).Field("_parriableOwner").SetValue(monster);
@@ -620,7 +628,7 @@ namespace Multiplayer {
             AutoAttributeManager.AutoReference(playerObject);
             AutoAttributeManager.AutoReferenceAllChildren(playerObject);
 
-            //makeDamage(playerObject, dp);
+            makeDamage(playerObject, dp);
 
             //var pp = playerObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.AddComponent<DamageDealer>();
             //pp.type = DamageType.MonsterAttack;
