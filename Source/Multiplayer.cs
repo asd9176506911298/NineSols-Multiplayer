@@ -8,6 +8,7 @@ using NineSolsAPI;
 using NineSolsAPI.Menu;
 using NineSolsAPI.Utils;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -302,11 +303,24 @@ namespace Multiplayer {
 
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode) {
             if (_client.FirstPeer != null) {
-                ClearPlayerObjects();
+                // Start a coroutine to wait for 3 seconds before clearing player objects
+                StartCoroutine(WaitAndClearPlayerObjects(scene));
+            }
+        }
+
+        private IEnumerator WaitAndClearPlayerObjects(Scene scene) {
+            // Wait for 3 seconds first
+            yield return new WaitForSeconds(0.1f);
+
+            // Wait until the game state is 'Playing'
+            while (GameCore.Instance.currentCoreState != GameCore.GameCoreState.Playing) {
+                yield return null; // Wait for the next frame before rechecking
             }
 
-            //titlescreenModifications.MaybeExtendMainMenu(scene);
+            // Execute the logic once the condition is met
+            ClearPlayerObjects();
         }
+
 
         private void ConnectToServer() {
             if (_client.IsRunning) return;
