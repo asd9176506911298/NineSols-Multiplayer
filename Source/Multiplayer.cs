@@ -542,12 +542,14 @@ namespace Multiplayer {
 
         private IEnumerator WaitAndClearPlayerObjects(Scene scene) {
             // Wait for 3 seconds first
-            yield return new WaitForSeconds(0.1f);
+            
 
             // Wait until the game state is 'Playing'
             while (GameCore.Instance.currentCoreState != GameCore.GameCoreState.Playing) {
-                yield return null; // Wait for the next frame before rechecking
+                yield return new WaitForSeconds(1f); // Wait for the next frame before rechecking
             }
+
+            yield return new WaitForSeconds(3f);
 
             // Execute the logic once the condition is met
             ClearPlayerObjects();
