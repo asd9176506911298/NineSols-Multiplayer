@@ -261,6 +261,8 @@ namespace Multiplayer {
             foreach (var obj in allObjects) {
                 if (obj.name == "StealthGameMonster_Minion_prefab") {
                     hiddenObject = obj;
+                    AutoAttributeManager.AutoReference(obj);
+                    AutoAttributeManager.AutoReferenceAllChildren(obj);
                     break;
                 }
             }
@@ -278,25 +280,27 @@ namespace Multiplayer {
             // Array of player object names
             ToastManager.Toast("test");
             //SceneManager.LoadScene("VR_Challenge_Hub");
-            //StartCoroutine(Test2Coroutine());
-            // Find the object in memory
-            GameObject hiddenObject = null;
-            var allObjects = Resources.FindObjectsOfTypeAll<GameObject>();
-            foreach (var obj in allObjects) {
-                if (obj.name == "StealthGameMonster_Minion_prefab") {
-                    hiddenObject = obj;
-                    break;
-                }
-            }
+            StartCoroutine(Test2Coroutine());
+            //// Find the object in memory
+            //GameObject hiddenObject = null;
+            //var allObjects = Resources.FindObjectsOfTypeAll<GameObject>();
+            //foreach (var obj in allObjects) {
+            //    if (obj.name == "StealthGameMonster_Minion_prefab") {
+            //        hiddenObject = obj;
+            //        AutoAttributeManager.AutoReference(obj);
+            //        AutoAttributeManager.AutoReferenceAllChildren(obj);
+            //        break;
+            //    }
+            //}
 
-            if (hiddenObject != null) {
-                ToastManager.Toast("Found object: " + hiddenObject.name);
-                // Do something with the object
-            } else {
-                ToastManager.Toast("Object not found.");
-            }
+            //if (hiddenObject != null) {
+            //    ToastManager.Toast("Found object: " + hiddenObject.name);
+            //    // Do something with the object
+            //} else {
+            //    ToastManager.Toast("Object not found.");
+            //}
 
-            var copy = Instantiate(hiddenObject);
+            //var copy = Instantiate(hiddenObject);
             //AutoAttributeManager.AutoReference(copy);
             //AutoAttributeManager.AutoReferenceAllChildren(copy);
 
@@ -306,7 +310,7 @@ namespace Multiplayer {
             //    try { context.EnterLevelAwake(); } catch (Exception ex) { Log.Error(ex.StackTrace); }
             //}
 
-            copy.transform.position = Player.i.transform.position;
+            //copy.transform.position = Player.i.transform.position;
 
 
             //StartCoroutine(PreloadSceneObjects("A2_S5_BossHorseman_Final", "A2_S5_ BossHorseman_GameLevel"));
@@ -756,9 +760,11 @@ namespace Multiplayer {
             var monsterPath = "A1_S2_GameLevel/Room/Prefab/Gameplay5/[自然巡邏框架]/[MonsterBehaviorProvider] LevelDesign_CullingAndResetGroup/[MonsterBehaviorProvider] LevelDesign_Init_Scenario (看守的人)/StealthGameMonster_Spearman (1)";
             var monsterCorePath = $"{monsterPath}/MonsterCore/Animator(Proxy)/Animator/LogicRoot/SwordSlashEffect/DamageArea";
 
-            var monster = GameObject.Find(monsterPath)?.GetComponent<StealthGameMonster>();
-            var bindingParry = GameObject.Find(monsterCorePath)?.GetComponent<DamageDealer>()?.bindingParry;
-
+            //var monster = GameObject.Find(monsterPath)?.GetComponent<StealthGameMonster>();
+            var monster = hiddenObject.GetComponent<MonsterBase>();
+            //var bindingParry = GameObject.Find(monsterCorePath)?.GetComponent<DamageDealer>()?.bindingParry;
+            var bindingParry = hiddenObject.transform.Find("MonsterCore/Animator(Proxy)/Animator/LogicRoot/SwordSlashEffect/DamageArea").GetComponent<DamageDealer>()?.bindingParry;
+            ToastManager.Toast($"bind:{bindingParry}");
             if (monster == null || bindingParry == null) {
                 ToastManager.Toast("Monster or binding parry not found.");
                 return;
@@ -785,6 +791,8 @@ namespace Multiplayer {
                     damageDealer.attacker = new Health(); //monster.health;
                     damageDealer.damageAmount = effectDealer.FinalValue;
 
+                    //Traverse.Create(damageDealer).Field("_parriableOwner").SetValue(monster);
+                    //Traverse.Create(damageDealer).Field("owner").SetValue(monster);
                     Traverse.Create(damageDealer).Field("_parriableOwner").SetValue(monster);
                     Traverse.Create(damageDealer).Field("owner").SetValue(monster);
                 }
