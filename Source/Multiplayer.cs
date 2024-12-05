@@ -4,6 +4,7 @@ using BepInEx.Configuration;
 using HarmonyLib;
 using LiteNetLib;
 using LiteNetLib.Utils;
+using Mono.Cecil;
 using NineSolsAPI;
 using NineSolsAPI.Menu;
 using NineSolsAPI.Preload;
@@ -36,6 +37,9 @@ namespace Multiplayer {
         private ConfigEntry<string> playerName;
         public bool isPVP;
 
+        [Preload("A1_S2_ConnectionToElevator_Final", "A1_S2_GameLevel")]
+        private GameObject? preloadedObject;
+
         //private TitlescreenModifications titlescreenModifications = new();
 
         public readonly Dictionary<int, PlayerData> _playerObjects = new();
@@ -50,6 +54,8 @@ namespace Multiplayer {
             Instance = this;
             Log.Init(Logger);
             try {
+                NineSolsAPICore.Preloader.AddPreloadClass(this);
+
                 RCGLifeCycle.DontDestroyForever(gameObject);
 
                 _harmony = Harmony.CreateAndPatchAll(typeof(Multiplayer).Assembly);
@@ -114,18 +120,215 @@ namespace Multiplayer {
             return targetComponent;
         }
 
-        public GameObject preloadedObject; // This will hold the preloaded GameObject after loading
+        private IEnumerator PreloadSceneObjects(string sceneName, string objectPath) {
+            // Load the scene asynchronously in the background.
+            AsyncOperation asyncLoad = SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Additive);
+
+            // Wait until the scene is fully loaded.
+            while (!asyncLoad.isDone) {
+                yield return null;
+            }
+
+            // Scene is now loaded, find the target object.
+            Scene loadedScene = SceneManager.GetSceneByName(sceneName);
+            GameObject targetObject = null;
+
+            if (loadedScene.IsValid()) {
+                // Temporarily activate the loaded scene.
+                SceneManager.SetActiveScene(loadedScene);
+
+                // Find the target GameObject.
+                targetObject = GameObject.Find(objectPath);
+
+                if (targetObject != null) {
+                    // Detach the object to make it a root GameObject.
+                    //targetObject.SetActive(true);
+                    //targetObject.transform.SetParent(null);
+
+                    // Ensure it's now a root object before making it persistent.
+                    if (targetObject.transform.parent == null) {
+                        //horse
+                        //Vector3 v = new Vector3(targetObject.transform.position.x, targetObject.transform.position.y + 100f, targetObject.transform.position.z);
+                        //Vector3 v = new Vector3(targetObject.transform.position.x, targetObject.transform.position.y - 500f, targetObject.transform.position.z);
+                        //Vector3 v = new Vector3(targetObject.transform.position.x + 100f, targetObject.transform.position.y + 95f, targetObject.transform.position.z);
+                        Vector3 v = new Vector3(targetObject.transform.position.x + 100f, targetObject.transform.position.y - 500f, targetObject.transform.position.z);
+                        targetObject.transform.position = v;
+                        ToastManager.Toast(GetGameObjectPath(targetObject.gameObject));
+                        RCGLifeCycle.DontDestroyForever(targetObject);
+                        //var levelAwakeList = targetObject.GetComponentsInChildren<ILevelAwake>(true);
+                        //for (var i = levelAwakeList.Length - 1; i >= 0; i--) {
+                        //    var context = levelAwakeList[i];
+                        //    try { context.EnterLevelAwake(); } catch (Exception ex) { Log.Error(ex.StackTrace); }
+                        //}
+                        Log.Info($"Found and persisted GameObject: {targetObject.name}");
+                    } else {
+                        Log.Warning($"Failed to detach GameObject: {targetObject.name}");
+                    }
+                } else {
+                    Log.Warning($"GameObject with path '{objectPath}' not found in scene '{sceneName}'.");
+                }
+            } else {
+                Log.Warning($"Scene '{sceneName}' is not valid or failed to load.");
+            }
+
+            // Unload the scene.
+            SceneManager.UnloadSceneAsync(sceneName);
+
+            Log.Info("Scene unloaded and active scene reverted.");
+
+            // Reload the current scene to reset the state if needed.
+            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        }
+
+        private IEnumerator LoadUnloadScene() {
+            string sceneName = "A1_S2_ConnectionToElevator_Final";
+
+            // Load the scene additively
+            AsyncOperation asyncLoad = SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Additive);
+            while (!asyncLoad.isDone) {
+                yield return null; // Wait for the scene to load
+            }
+
+            Log.Info($"Scene {sceneName} loaded.");
+
+            // Access the loaded scene
+            Scene loadedScene = SceneManager.GetSceneByName(sceneName);
+            if (!loadedScene.IsValid()) {
+                Log.Error($"Scene {sceneName} is not valid after loading.");
+                yield break;
+            }
+
+            // Unload the scene
+            AsyncOperation asyncUnload = SceneManager.UnloadSceneAsync(sceneName);
+            while (!asyncUnload.isDone) {
+                yield return null; // Wait for the scene to unload
+            }
+
+            Log.Info($"Scene {sceneName} unloaded.");
+
+            // Wait for 3 seconds
+            Log.Info("Waiting for 3 seconds before reloading the active scene...");
+            yield return WaitForPrefabAndGameCoreState("StealthGameMonster_Minion_prefab");
+
+            // Reload the active scene
+            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+            Log.Info("Active scene reloaded.");
+        }
+
+        GameObject hiddenObject = null;
+
+        private IEnumerator WaitForPrefabAndGameCoreState(string prefabName, float timeoutSeconds = 2f) {
+            
+            float elapsedTime = 0f;
+
+            // Continuously check for the prefab and game state within the timeout duration
+            while (hiddenObject == null && elapsedTime < timeoutSeconds) {
+                // Check all objects for the target prefab
+                foreach (var obj in Resources.FindObjectsOfTypeAll<GameObject>()) {
+                    if (obj.name == prefabName) {
+                        hiddenObject = obj;
+                        break;
+                    }
+                }
+
+                // Log if the object hasn't been found yet (optional)
+                if (hiddenObject == null) {
+                    Log.Info($"Waiting for '{prefabName}' to be found...");
+                }
+
+                // Wait for the next frame and increment elapsed time
+                yield return null;
+                elapsedTime += Time.deltaTime;
+            }
+
+            if (hiddenObject == null) {
+                Log.Warning($"Timeout: Prefab '{prefabName}' not found within {timeoutSeconds} seconds.");
+                yield break;
+            }
+
+            yield return new WaitForSeconds(3f);
+            Log.Info($"Prefab '{hiddenObject.name}' found within {elapsedTime:F2} seconds.");
+        }
+
+        private IEnumerator Test2Coroutine() {
+            // Execute the scene loading/unloading coroutine
+            yield return StartCoroutine(LoadUnloadScene());
+
+            // Once the scene is unloaded, search for the object
+            GameObject hiddenObject = null;
+            var allObjects = Resources.FindObjectsOfTypeAll<GameObject>();
+
+            foreach (var obj in allObjects) {
+                if (obj.name == "StealthGameMonster_Minion_prefab") {
+                    hiddenObject = obj;
+                    break;
+                }
+            }
+
+            // Log the result of the search
+            if (hiddenObject != null) {
+                Log.Info($"Object '{hiddenObject.name}' found.");
+            } else {
+                Log.Warning("Object 'StealthGameMonster_Minion_prefab' not found.");
+            }
+        }
+
 
         void test2() {
             // Array of player object names
             ToastManager.Toast("test");
-
-            foreach (var gameObject in Resources.FindObjectsOfTypeAll<GameObject>()) {
-                var monsterBases = gameObject.GetComponentsInChildren<DamageDealer>(true);
-                foreach (var monster in monsterBases) {
-                    ToastManager.Toast(GetGameObjectPath(monster.gameObject));
+            //SceneManager.LoadScene("VR_Challenge_Hub");
+            //StartCoroutine(Test2Coroutine());
+            // Find the object in memory
+            GameObject hiddenObject = null;
+            var allObjects = Resources.FindObjectsOfTypeAll<GameObject>();
+            foreach (var obj in allObjects) {
+                if (obj.name == "StealthGameMonster_Minion_prefab") {
+                    hiddenObject = obj;
+                    break;
                 }
             }
+
+            if (hiddenObject != null) {
+                ToastManager.Toast("Found object: " + hiddenObject.name);
+                // Do something with the object
+            } else {
+                ToastManager.Toast("Object not found.");
+            }
+
+            var copy = Instantiate(hiddenObject);
+            //AutoAttributeManager.AutoReference(copy);
+            //AutoAttributeManager.AutoReferenceAllChildren(copy);
+
+            //var levelAwakeList = copy.GetComponentsInChildren<ILevelAwake>(true);
+            //for (var i = levelAwakeList.Length - 1; i >= 0; i--) {
+            //    var context = levelAwakeList[i];
+            //    try { context.EnterLevelAwake(); } catch (Exception ex) { Log.Error(ex.StackTrace); }
+            //}
+
+            copy.transform.position = Player.i.transform.position;
+
+
+            //StartCoroutine(PreloadSceneObjects("A2_S5_BossHorseman_Final", "A2_S5_ BossHorseman_GameLevel"));
+            //StartCoroutine(PreloadSceneObjects("A3_S5_BossGouMang_Final", "A3_S5_BossGouMang_GameLevel"));
+            //StartCoroutine(PreloadSceneObjects("A11_S0_Boss_YiGung", "GameLevel"));
+            //ToastManager.Toast(GameObject.Find("Room/StealthGameMonster_SpearHorseMan"));
+            //var copy = GameObject.Find("Room");
+            //AutoAttributeManager.AutoReference(copy);
+            //AutoAttributeManager.AutoReferenceAllChildren(copy);
+
+            //var levelAwakeList = copy.GetComponentsInChildren<ILevelAwake>(true);
+            //for (var i = levelAwakeList.Length - 1; i >= 0; i--) {
+            //    var context = levelAwakeList[i];
+            //    try { context.EnterLevelAwake(); } catch (Exception ex) { Log.Error(ex.StackTrace); }
+            //}
+
+            //foreach (var gameObject in Resources.FindObjectsOfTypeAll<GameObject>()) {
+            //    var monsterBases = gameObject.GetComponentsInChildren<DamageDealer>(true);
+            //    foreach (var monster in monsterBases) {
+            //        ToastManager.Toast(GetGameObjectPath(monster.gameObject));
+            //    }
+            //}
 
 
             //ToastManager.Toast(Player.i.transform.Find("RotateProxy/SpriteHolder/HitBoxManager"));
