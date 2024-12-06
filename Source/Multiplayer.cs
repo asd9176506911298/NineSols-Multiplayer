@@ -224,9 +224,9 @@ namespace Multiplayer {
             // Continuously check for the prefab and game state within the timeout duration
             while (hiddenObject == null && elapsedTime < timeoutSeconds) {
                 // Check all objects for the target prefab
-                foreach (var obj in Resources.FindObjectsOfTypeAll<GameObject>()) {
+                foreach (var obj in Resources.FindObjectsOfTypeAll<MonsterBase>()) {
                     if (obj.name == prefabName) {
-                        hiddenObject = obj;
+                        hiddenObject = obj.gameObject;
                         break;
                     }
                 }
@@ -256,13 +256,13 @@ namespace Multiplayer {
 
             // Once the scene is unloaded, search for the object
             GameObject hiddenObject = null;
-            var allObjects = Resources.FindObjectsOfTypeAll<GameObject>();
+            var allObjects = Resources.FindObjectsOfTypeAll<MonsterBase>();
 
             foreach (var obj in allObjects) {
                 if (obj.name == "StealthGameMonster_Minion_prefab") {
-                    hiddenObject = obj;
-                    AutoAttributeManager.AutoReference(obj);
-                    AutoAttributeManager.AutoReferenceAllChildren(obj);
+                    hiddenObject = obj.gameObject;
+                    AutoAttributeManager.AutoReference(hiddenObject);
+                    AutoAttributeManager.AutoReferenceAllChildren(hiddenObject);
                     break;
                 }
             }
@@ -281,6 +281,11 @@ namespace Multiplayer {
             ToastManager.Toast("test");
             //SceneManager.LoadScene("VR_Challenge_Hub");
             StartCoroutine(Test2Coroutine());
+
+            //foreach (var obj in Resources.FindObjectsOfTypeAll<MonsterBase>()) {
+            //    if (obj.name == "StealthGameMonster_Minion_prefab")
+            //        ToastManager.Toast("StealthGameMonster_Minion_prefab");
+            //}
             //// Find the object in memory
             //GameObject hiddenObject = null;
             //var allObjects = Resources.FindObjectsOfTypeAll<GameObject>();
