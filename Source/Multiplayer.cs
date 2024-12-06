@@ -246,7 +246,6 @@ namespace Multiplayer {
                 yield break;
             }
 
-            yield return new WaitForSeconds(3f);
             Log.Info($"Prefab '{hiddenObject.name}' found within {elapsedTime:F2} seconds.");
         }
 
@@ -255,7 +254,6 @@ namespace Multiplayer {
             yield return StartCoroutine(LoadUnloadScene());
 
             // Once the scene is unloaded, search for the object
-            GameObject hiddenObject = null;
             var allObjects = Resources.FindObjectsOfTypeAll<MonsterBase>();
 
             foreach (var obj in allObjects) {
@@ -280,8 +278,11 @@ namespace Multiplayer {
             // Array of player object names
             ToastManager.Toast("test");
             //SceneManager.LoadScene("VR_Challenge_Hub");
-            StartCoroutine(Test2Coroutine());
-
+            if(hiddenObject == null && Player.i != null)
+                StartCoroutine(Test2Coroutine());
+            else {
+                ToastManager.Toast("ddddddddnull");
+            }
             //foreach (var obj in Resources.FindObjectsOfTypeAll<MonsterBase>()) {
             //    if (obj.name == "StealthGameMonster_Minion_prefab")
             //        ToastManager.Toast("StealthGameMonster_Minion_prefab");
