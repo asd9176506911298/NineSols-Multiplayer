@@ -571,6 +571,8 @@ namespace Multiplayer {
             _localPlayerId = -1;
             ClearPlayerObjects();
 
+            if (Player.i == null) return;
+
             var effectReceiver = Player.i.transform
                         .Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")
                         .GetComponent<EffectReceiver>();
@@ -579,6 +581,12 @@ namespace Multiplayer {
                                             EffectType.BreakableBreaker |
                                             EffectType.ShieldBreak |
                                             EffectType.PostureDecreaseEffect;
+            }
+
+            if (hiddenObject == null && Player.i != null)
+                StartCoroutine(Test2Coroutine());
+            else {
+                ToastManager.Toast("ddddddddnull");
             }
         }
 
@@ -728,6 +736,7 @@ namespace Multiplayer {
 
             // If the player object doesn't exist, create it
             if (!_playerObjects.TryGetValue(playerId, out var playerData)) {
+                if (hiddenObject == null) return;
                 ToastManager.Toast(playerId); // Notify that a new player object is being created
                 playerData = CreatePlayerObject(playerId, position);
                 _playerObjects[playerId] = playerData;
