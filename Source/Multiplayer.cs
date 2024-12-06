@@ -36,10 +36,10 @@ namespace Multiplayer {
         private ConfigEntry<bool> leave;
         private ConfigEntry<string> pvp;
         private ConfigEntry<string> playerName;
+        private ConfigEntry<bool> displayPlayerName;
+        private ConfigEntry<int> playerNameSize;
         public bool isPVP;
 
-        [Preload("A1_S2_ConnectionToElevator_Final", "A1_S2_GameLevel")]
-        private GameObject? preloadedObject;
 
         //private TitlescreenModifications titlescreenModifications = new();
 
@@ -69,7 +69,9 @@ namespace Multiplayer {
                 join = Config.Bind("", "Join Server Button", false, "");
                 leave = Config.Bind("", "Leave Server Button", false, "");
                 pvp = Config.Bind("", "Server PVP State", "", "");
-                playerName = Config.Bind("", "Your Player Name", "", "");
+                playerName = Config.Bind("Name", "Your Player Name", "", "");
+                displayPlayerName = Config.Bind("Name", "Is Display Player Name", true, "");
+                playerNameSize = Config.Bind("Name", "Player Name Size", 200, "");
 
 #if DEBUG
                 KeybindManager.Add(this, ConnectToServer, () => new KeyboardShortcut(KeyCode.S,KeyCode.LeftControl));
@@ -82,6 +84,8 @@ namespace Multiplayer {
 
                 join.SettingChanged += (_, _) => { if (join.Value) ConnectToServer(); join.Value = false; };
                 leave.SettingChanged += (_, _) => { if (leave.Value) DisconnectFromServer(); leave.Value = false; };
+                displayPlayerName.SettingChanged += (_, _) =>  SetPlayerNameVisible();
+                playerNameSize.SettingChanged += (_, _) => SetPlayerNameSize();
 
                 SceneManager.sceneLoaded += OnSceneLoaded;
             } catch (Exception e) {
@@ -90,6 +94,45 @@ namespace Multiplayer {
 
             Log.Info("Multiplayer plugin initialized.");
         }
+        void SetPlayerNameSize() {
+            // Cache the player name size value
+            float fontSize = playerNameSize.Value;
+
+            // Iterate over the values directly if keys are not needed
+            foreach (var player in _playerObjects.Values) {
+                // Attempt to find the "PlayerName" GameObject
+                var playerNameTransform = player.PlayerObject.transform.Find("PlayerName");
+
+                if (playerNameTransform != null) {
+                    // Get the TextMeshPro component
+                    var textMeshPro = playerNameTransform.GetComponent<TextMeshPro>();
+
+                    if (textMeshPro != null) {
+                        // Set the font size
+                        textMeshPro.fontSize = fontSize;
+                    } else {
+                        // Optional: Log a warning if TextMeshPro is missing
+                        Log.Warning($"TextMeshPro component not found in {player.PlayerObject.name}'s PlayerName.");
+                    }
+                } else {
+                    // Optional: Log a warning if "PlayerName" GameObject is missing
+                    Log.Warning($"PlayerName GameObject not found in {player.PlayerObject.name}");
+                }
+            }
+        }
+
+
+        private void SetPlayerNameVisible() {
+            bool isVisible = displayPlayerName.Value;
+
+            foreach (var player in _playerObjects.Values) {
+                var playerNameObject = player.PlayerObject.transform.Find("PlayerName")?.gameObject;
+                if (playerNameObject != null) {
+                    playerNameObject.SetActive(isVisible);
+                }
+            }
+        }
+
 #if DEBUG
         public static T CopyComponent<T>(T source, GameObject target) where T : Component {
             if (source == null || target == null)
@@ -278,12 +321,15 @@ namespace Multiplayer {
         void test2() {
             // Array of player object names
             ToastManager.Toast("test");
-            //SceneManager.LoadScene("VR_Challenge_Hub");
-            if(hiddenObject == null && Player.i != null)
-                StartCoroutine(Test2Coroutine());
-            else {
-                ToastManager.Toast("ddddddddnull");
+            foreach(var x in _playerObjects) {
+                x.Value.PlayerObject.transform.Find("PlayerName").gameObject.SetActive(false);
             }
+            //SceneManager.LoadScene("VR_Challenge_Hub");
+            //if(hiddenObject == null && Player.i != null)
+            //    StartCoroutine(Test2Coroutine());
+            //else {
+            //    ToastManager.Toast("ddddddddnull");
+            //}
             //foreach (var obj in Resources.FindObjectsOfTypeAll<MonsterBase>()) {
             //    if (obj.name == "StealthGameMonster_Minion_prefab")
             //        ToastManager.Toast("StealthGameMonster_Minion_prefab");
@@ -914,9 +960,12 @@ namespace Multiplayer {
             );
 
             var name = new GameObject("PlayerName");
+
+            if (!displayPlayerName.Value)
+                name.SetActive(false);
             var text = name.AddComponent<TextMeshPro>();
             text.text = "Yuki";
-            text.fontSize = 300;
+            text.fontSize = playerNameSize.Value;
             // Optionally, enable auto sizing if needed
             // text.autoSizeTextContainer = true;
 
@@ -935,7 +984,7 @@ namespace Multiplayer {
 
             // Optional: If the text container is too constrained, make sure it's wide enough
             // You can adjust the container's size or enable auto-sizing for the text
-            text.rectTransform.sizeDelta = new Vector2(200f, 50f);  // Adjust width and height based on needs
+            text.rectTransform.sizeDelta = new Vector2(2000f, 50f);  // Adjust width and height based on needs
 
             Destroy(playerObject.GetComponent<Player>());
             var dp = playerObject.AddComponent<Player>();
