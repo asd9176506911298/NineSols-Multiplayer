@@ -634,7 +634,6 @@ namespace Multiplayer {
                 }
             }
 
-            Log.Info(Player.i.playerInput.currentStateType);
             _client.PollEvents();
         }
 
