@@ -702,7 +702,7 @@ namespace Multiplayer {
                     HandleDisconnectObject(reader);
                     break;
                 case "PvPEnabled":
-                    enablePVP(reader);
+                    EnablePVP(reader);
                     break;
                 case "GetName":
                     var playerId = reader.GetInt();
@@ -718,35 +718,46 @@ namespace Multiplayer {
             }
         }
 
-        private void enablePVP(NetDataReader reader) {
-            var enable = reader.GetBool();
-            isPVP = enable;
-            pvp.Value = enable ? "PVP Enable" : "PVP Disable";
-            ToastManager.Toast($"PvP {(enable ? "Enabled" : "Disabled")}");
-            if (isPVP) {
-                var effectReceiver = Player.i.transform
-                    .Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")
-                    ?.GetComponent<EffectReceiver>();
+        private void EnablePVP(NetDataReader reader) {
+            isPVP = reader.GetBool();
+            pvp.Value = isPVP ? "PVP Enabled" : "PVP Disabled";
+            ToastManager.Toast($"PvP {(isPVP ? "Enabled" : "Disabled")}");
 
-                if (effectReceiver != null) {
-                    effectReceiver.effectType = EffectType.EnemyAttack |
+            var effectReceiver = Player.i.transform
+                .Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")
+                ?.GetComponent<EffectReceiver>();
+
+            if (effectReceiver != null) {
+                if (isPVP) {
+                    effectReceiver.effectType |= EffectType.EnemyAttack |
                                                   EffectType.BreakableBreaker |
                                                   EffectType.ShieldBreak |
                                                   EffectType.PostureDecreaseEffect;
-                }
-            } else {
-                var effectReceiver = Player.i.transform
-                    .Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")
-                    ?.GetComponent<EffectReceiver>();
 
-                if (effectReceiver != null) {
+                    foreach (var x in _playerObjects) {
+                        var e = x.Value.PlayerObject.transform.Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")?.GetComponent<EffectReceiver>();
+                        e.effectType |= EffectType.EnemyAttack |
+                                                  EffectType.BreakableBreaker |
+                                                  EffectType.ShieldBreak |
+                                                  EffectType.PostureDecreaseEffect;
+                    }
+                } else {
                     effectReceiver.effectType &= ~(
-                                   EffectType.BreakableBreaker |
-                                   EffectType.ShieldBreak |
-                                   EffectType.PostureDecreaseEffect);
+                        EffectType.BreakableBreaker |
+                        EffectType.ShieldBreak |
+                        EffectType.PostureDecreaseEffect);
+
+                    foreach (var x in _playerObjects) {
+                        var e = x.Value.PlayerObject.transform.Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")?.GetComponent<EffectReceiver>();
+                        e.effectType &= ~(
+                        EffectType.BreakableBreaker |
+                        EffectType.ShieldBreak |
+                        EffectType.PostureDecreaseEffect);
+                    }
                 }
             }
         }
+
 
         private void HandlePositionMessage(NetDataReader reader) {
             var playerId = reader.GetInt();
