@@ -40,6 +40,7 @@ namespace Multiplayer {
         private ConfigEntry<int> playerNameSize;
         public bool isPVP;
 
+        GameObject minionPrefab = null;
 
         //private TitlescreenModifications titlescreenModifications = new();
 
@@ -224,98 +225,9 @@ namespace Multiplayer {
             SceneManager.LoadScene(SceneManager.GetActiveScene().name);
         }
 
-        private IEnumerator LoadUnloadScene() {
-            string sceneName = "A1_S2_ConnectionToElevator_Final";
+        
 
-            // Load the scene additively
-            AsyncOperation asyncLoad = SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Additive);
-            while (!asyncLoad.isDone) {
-                yield return null; // Wait for the scene to load
-            }
-
-            Log.Info($"Scene {sceneName} loaded.");
-
-            // Access the loaded scene
-            Scene loadedScene = SceneManager.GetSceneByName(sceneName);
-            if (!loadedScene.IsValid()) {
-                Log.Error($"Scene {sceneName} is not valid after loading.");
-                yield break;
-            }
-
-            // Unload the scene
-            AsyncOperation asyncUnload = SceneManager.UnloadSceneAsync(sceneName);
-            while (!asyncUnload.isDone) {
-                yield return null; // Wait for the scene to unload
-            }
-
-            Log.Info($"Scene {sceneName} unloaded.");
-
-            // Wait for 3 seconds
-            Log.Info("Waiting for 3 seconds before reloading the active scene...");
-            yield return WaitForPrefabAndGameCoreState("StealthGameMonster_Minion_prefab");
-
-            // Reload the active scene
-            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
-            Log.Info("Active scene reloaded.");
-        }
-
-        GameObject hiddenObject = null;
-
-        private IEnumerator WaitForPrefabAndGameCoreState(string prefabName, float timeoutSeconds = 2f) {
-            
-            float elapsedTime = 0f;
-
-            // Continuously check for the prefab and game state within the timeout duration
-            while (hiddenObject == null && elapsedTime < timeoutSeconds) {
-                // Check all objects for the target prefab
-                foreach (var obj in Resources.FindObjectsOfTypeAll<MonsterBase>()) {
-                    if (obj.name == prefabName) {
-                        hiddenObject = obj.gameObject;
-                        break;
-                    }
-                }
-
-                // Log if the object hasn't been found yet (optional)
-                if (hiddenObject == null) {
-                    Log.Info($"Waiting for '{prefabName}' to be found...");
-                }
-
-                // Wait for the next frame and increment elapsed time
-                yield return null;
-                elapsedTime += Time.deltaTime;
-            }
-
-            if (hiddenObject == null) {
-                Log.Warning($"Timeout: Prefab '{prefabName}' not found within {timeoutSeconds} seconds.");
-                yield break;
-            }
-
-            Log.Info($"Prefab '{hiddenObject.name}' found within {elapsedTime:F2} seconds.");
-        }
-
-        private IEnumerator Test2Coroutine() {
-            // Execute the scene loading/unloading coroutine
-            yield return StartCoroutine(LoadUnloadScene());
-
-            // Once the scene is unloaded, search for the object
-            var allObjects = Resources.FindObjectsOfTypeAll<MonsterBase>();
-
-            foreach (var obj in allObjects) {
-                if (obj.name == "StealthGameMonster_Minion_prefab") {
-                    hiddenObject = obj.gameObject;
-                    AutoAttributeManager.AutoReference(hiddenObject);
-                    AutoAttributeManager.AutoReferenceAllChildren(hiddenObject);
-                    break;
-                }
-            }
-
-            // Log the result of the search
-            if (hiddenObject != null) {
-                Log.Info($"Object '{hiddenObject.name}' found.");
-            } else {
-                Log.Warning("Object 'StealthGameMonster_Minion_prefab' not found.");
-            }
-        }
+        
 
 
         void test2() {
@@ -325,7 +237,7 @@ namespace Multiplayer {
                 x.Value.PlayerObject.transform.Find("PlayerName").gameObject.SetActive(false);
             }
             //SceneManager.LoadScene("VR_Challenge_Hub");
-            //if(hiddenObject == null && Player.i != null)
+            //if(minionPrefab == null && Player.i != null)
             //    StartCoroutine(Test2Coroutine());
             //else {
             //    ToastManager.Toast("ddddddddnull");
@@ -335,25 +247,25 @@ namespace Multiplayer {
             //        ToastManager.Toast("StealthGameMonster_Minion_prefab");
             //}
             //// Find the object in memory
-            //GameObject hiddenObject = null;
+            //GameObject minionPrefab = null;
             //var allObjects = Resources.FindObjectsOfTypeAll<GameObject>();
             //foreach (var obj in allObjects) {
             //    if (obj.name == "StealthGameMonster_Minion_prefab") {
-            //        hiddenObject = obj;
+            //        minionPrefab = obj;
             //        AutoAttributeManager.AutoReference(obj);
             //        AutoAttributeManager.AutoReferenceAllChildren(obj);
             //        break;
             //    }
             //}
 
-            //if (hiddenObject != null) {
-            //    ToastManager.Toast("Found object: " + hiddenObject.name);
+            //if (minionPrefab != null) {
+            //    ToastManager.Toast("Found object: " + minionPrefab.name);
             //    // Do something with the object
             //} else {
             //    ToastManager.Toast("Object not found.");
             //}
 
-            //var copy = Instantiate(hiddenObject);
+            //var copy = Instantiate(minionPrefab);
             //AutoAttributeManager.AutoReference(copy);
             //AutoAttributeManager.AutoReferenceAllChildren(copy);
 
@@ -631,11 +543,104 @@ namespace Multiplayer {
                                             EffectType.PostureDecreaseEffect;
             }
 
-            if (hiddenObject == null && Player.i != null)
-                StartCoroutine(Test2Coroutine());
+            if (minionPrefab == null && Player.i != null)
+                StartCoroutine(PreloadMinionPrefab());
             else {
                 ToastManager.Toast("ddddddddnull");
             }
+        }
+
+        private IEnumerator PreloadMinionPrefab() {
+            // Execute the scene loading/unloading coroutine
+            yield return StartCoroutine(LoadUnloadScene());
+
+            // Once the scene is unloaded, search for the object
+            var allObjects = Resources.FindObjectsOfTypeAll<MonsterBase>();
+
+            foreach (var obj in allObjects) {
+                if (obj.name == "StealthGameMonster_Minion_prefab") {
+                    minionPrefab = obj.gameObject;
+                    AutoAttributeManager.AutoReference(minionPrefab);
+                    AutoAttributeManager.AutoReferenceAllChildren(minionPrefab);
+                    break;
+                }
+            }
+
+            // Log the result of the search
+            if (minionPrefab != null) {
+                Log.Info($"Object '{minionPrefab.name}' found.");
+            } else {
+                Log.Warning("Object 'StealthGameMonster_Minion_prefab' not found.");
+            }
+        }
+
+        private IEnumerator LoadUnloadScene() {
+            string sceneName = "A1_S2_ConnectionToElevator_Final";
+
+            // Load the scene additively
+            AsyncOperation asyncLoad = SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Additive);
+            while (!asyncLoad.isDone) {
+                yield return null; // Wait for the scene to load
+            }
+
+            Log.Info($"Scene {sceneName} loaded.");
+
+            // Access the loaded scene
+            Scene loadedScene = SceneManager.GetSceneByName(sceneName);
+            if (!loadedScene.IsValid()) {
+                Log.Error($"Scene {sceneName} is not valid after loading.");
+                yield break;
+            }
+
+            // Unload the scene
+            AsyncOperation asyncUnload = SceneManager.UnloadSceneAsync(sceneName);
+            while (!asyncUnload.isDone) {
+                yield return null; // Wait for the scene to unload
+            }
+
+            Log.Info($"Scene {sceneName} unloaded.");
+
+            // Wait for 3 seconds
+            Log.Info("Waiting for 3 seconds before reloading the active scene...");
+            yield return WaitForPrefabAndGameCoreState("StealthGameMonster_Minion_prefab");
+
+            // Reload the active scene
+            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+            Log.Info("Active scene reloaded.");
+        }
+
+
+
+        private IEnumerator WaitForPrefabAndGameCoreState(string prefabName, float timeoutSeconds = 2f) {
+
+            float elapsedTime = 0f;
+
+            // Continuously check for the prefab and game state within the timeout duration
+            while (minionPrefab == null && elapsedTime < timeoutSeconds) {
+                // Check all objects for the target prefab
+                foreach (var obj in Resources.FindObjectsOfTypeAll<MonsterBase>()) {
+                    if (obj.name == prefabName) {
+                        minionPrefab = obj.gameObject;
+                        break;
+                    }
+                }
+
+                // Log if the object hasn't been found yet (optional)
+                if (minionPrefab == null) {
+                    Log.Info($"Waiting for '{prefabName}' to be found...");
+                }
+
+                // Wait for the next frame and increment elapsed time
+                yield return null;
+                elapsedTime += Time.deltaTime;
+            }
+
+            if (minionPrefab == null) {
+                Log.Warning($"Timeout: Prefab '{prefabName}' not found within {timeoutSeconds} seconds.");
+                yield break;
+            }
+
+            Log.Info($"Prefab '{minionPrefab.name}' found within {elapsedTime:F2} seconds.");
         }
 
         private async void DisconnectFromServer() {
@@ -832,7 +837,7 @@ namespace Multiplayer {
 
             // If the player object doesn't exist, create it
             if (!_playerObjects.TryGetValue(playerId, out var playerData)) {
-                if (hiddenObject == null) return;
+                if (minionPrefab == null) return;
                 _dataWriter.Reset();
                 _dataWriter.Put("GetName");
                 _dataWriter.Put(playerId);
@@ -875,8 +880,8 @@ namespace Multiplayer {
             }
 
             // Get monster and binding parry references
-            var monster = hiddenObject.GetComponent<MonsterBase>();
-            var bindingParry = hiddenObject.transform
+            var monster = minionPrefab.GetComponent<MonsterBase>();
+            var bindingParry = minionPrefab.transform
                 .Find("MonsterCore/Animator(Proxy)/Animator/LogicRoot/SwordSlashEffect/DamageArea")
                 ?.GetComponent<DamageDealer>()?.bindingParry;
 
