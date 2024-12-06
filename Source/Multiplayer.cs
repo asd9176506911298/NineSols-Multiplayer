@@ -553,7 +553,7 @@ namespace Multiplayer {
             // Wait until the game state is 'Playing'
             while (GameCore.Instance.currentCoreState != GameCore.GameCoreState.Playing || Player.i.playerInput.currentStateType == PlayerInputStateType.Cutscene) {
                 ToastManager.Toast(GameCore.Instance.currentCoreState);
-                yield return new WaitForSeconds(0.1f); // Wait for the next frame before rechecking
+                yield return new WaitForSeconds(0.3f); // Wait for the next frame before rechecking
             }
 
             //yield return new WaitForSeconds(2f);
