@@ -69,12 +69,27 @@ namespace Server {
                         Console.WriteLine("Invalid scene name. Usage: tp <SceneName>");
                     }
                 }
+                  // Handle "say" command
+                  else if (command.StartsWith("say ", StringComparison.OrdinalIgnoreCase)) {
+                    var message = "Server Owner:" + command.Substring(4).Trim();
+                    if (!string.IsNullOrEmpty(message)) {
+                        _writer = new NetDataWriter();
+                        _writer.Put(message);
+                        foreach (var peer in _server.ConnectedPeerList) {
+                            peer.Send(_writer, DeliveryMethod.ReliableOrdered);
+                        }
+                        Console.WriteLine($"Message sent: {message}");
+                    } else {
+                        Console.WriteLine("Invalid message. Usage: say <message>");
+                    }
+                }
                   // Handle unknown commands
                   else {
                     Console.WriteLine($"Unknown command: {command}");
                 }
             }
         }
+
 
 
         private static void EnablePvP(bool enable) {
