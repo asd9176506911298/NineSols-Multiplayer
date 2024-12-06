@@ -553,7 +553,7 @@ namespace Multiplayer {
 
             // Wait until the game state is 'Playing'
             while (GameCore.Instance.currentCoreState != GameCore.GameCoreState.Playing || Player.i.playerInput.currentStateType == PlayerInputStateType.Cutscene) {
-                ToastManager.Toast(GameCore.Instance.currentCoreState);
+                //ToastManager.Toast(GameCore.Instance.currentCoreState);
                 yield return new WaitForSeconds(0.3f); // Wait for the next frame before rechecking
             }
 
@@ -707,9 +707,9 @@ namespace Multiplayer {
                 case "GetName":
                     var playerId = reader.GetInt();
                     var name = reader.GetString();
-                    ToastManager.Toast($"11111111111 {playerId} {name}");
+                    //ToastManager.Toast($"11111111111 {playerId} {name}");
                     _playerObjects[playerId].name = name;
-                    ToastManager.Toast(_playerObjects[playerId].PlayerObject);
+                    //ToastManager.Toast(_playerObjects[playerId].PlayerObject);
                     _playerObjects[playerId].PlayerObject.transform.Find("PlayerName").GetComponent<TextMeshPro>().text = name;
                     break;
                 default:
@@ -785,7 +785,7 @@ namespace Multiplayer {
             var hitBoxManager = Player.i.transform.Find("RotateProxy/SpriteHolder/HitBoxManager")?.transform;
 
             if (hitBoxManager == null) {
-                ToastManager.Toast("HitBoxManager not found.");
+                //ToastManager.Toast("HitBoxManager not found.");
                 return;
             }
 
@@ -796,22 +796,22 @@ namespace Multiplayer {
             var monster = hiddenObject.GetComponent<MonsterBase>();
             //var bindingParry = GameObject.Find(monsterCorePath)?.GetComponent<DamageDealer>()?.bindingParry;
             var bindingParry = hiddenObject.transform.Find("MonsterCore/Animator(Proxy)/Animator/LogicRoot/SwordSlashEffect/DamageArea").GetComponent<DamageDealer>()?.bindingParry;
-            ToastManager.Toast($"bind:{bindingParry}");
+            //ToastManager.Toast($"bind:{bindingParry}");
             if (monster == null || bindingParry == null) {
-                ToastManager.Toast("Monster or binding parry not found.");
+                //ToastManager.Toast("Monster or binding parry not found.");
                 return;
             }
 
             for (int i = 0; i < hitBoxManager.childCount; i++) {
                 var child = hitBoxManager.GetChild(i);
                 var name = child.name;
-                ToastManager.Toast(name);
+                //ToastManager.Toast(name);
 
                 var hitBoxPath = $"RotateProxy/SpriteHolder/HitBoxManager/{name}";
                 var effectDealer = playerObject.transform.Find(hitBoxPath)?.GetComponent<EffectDealer>();
 
                 if (effectDealer == null) {
-                    ToastManager.Toast($"EffectDealer not found for {name}");
+                    //ToastManager.Toast($"EffectDealer not found for {name}");
                     continue;
                 }
 
@@ -847,7 +847,7 @@ namespace Multiplayer {
                                                   EffectType.ShieldBreak |
                                                   EffectType.PostureDecreaseEffect;
                 } else {
-                    ToastManager.Toast("EffectReceiver not found.");
+                    //ToastManager.Toast("EffectReceiver not found.");
                 }
 
                 // Set customDealers field
