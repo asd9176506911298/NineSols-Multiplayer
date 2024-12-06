@@ -766,7 +766,7 @@ namespace Multiplayer {
                     break;
                 case "tp":
                     var tpSceneName = reader.GetString();
-
+                    if (SceneManager.GetActiveScene().name == tpSceneName) break;
                     // Go to the target scene
                     GameCore.Instance?.GoToScene(tpSceneName);
 
