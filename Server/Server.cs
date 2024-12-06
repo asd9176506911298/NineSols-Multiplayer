@@ -3,8 +3,10 @@ using LiteNetLib.Utils;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Runtime.Remoting.Messaging;
 using System.Threading;
 using System.Threading.Tasks;
+using UnityEngine;
 
 namespace Server {
     internal class Server {
@@ -132,7 +134,16 @@ namespace Server {
                     }
                     Console.WriteLine(playersName);
                     BroadcastSystemMessage($"{name} connected. Player Count:{_server.ConnectedPeersCount}\n{playersName}", peer);
-                    
+
+                    _writer = new NetDataWriter();
+                    _writer.Put("Name");
+                    _writer.Put(peer.Id);
+                    _writer.Put(name);
+                    foreach (var p in _server.ConnectedPeerList) {
+                        if (p != peer) {
+                            p.Send(_writer, DeliveryMethod.ReliableOrdered);
+                        }
+                    }
                     break;
                 case "Leave":
                     var namee = reader.GetString();

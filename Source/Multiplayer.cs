@@ -15,6 +15,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -703,6 +704,11 @@ namespace Multiplayer {
                 case "PvPEnabled":
                     enablePVP(reader);
                     break;
+                case "Name":
+                    var playerId = reader.GetInt();
+                    var name = reader.GetString();
+                    ToastManager.Toast($"11111111111 {playerId} {name}");
+                    break;
                 default:
                     ToastManager.Toast(messageType);
                     break;
@@ -852,6 +858,22 @@ namespace Multiplayer {
                 Quaternion.identity
             );
 
+            var name = new GameObject("PlayerName");
+            var text = name.AddComponent<TextMeshPro>();
+            text.text = "Yuki";
+            text.fontSize = 300;
+            text.autoSizeTextContainer = true;
+
+            // Set the text position to the player's position
+            Vector3 playerPosition = playerObject.transform.position;
+
+            // Adjust the text's position by adding an offset to the y-axis
+            text.transform.position = new Vector3(playerPosition.x, playerPosition.y + 50f, playerPosition.z);
+
+            // Set the parent of the text to the player object
+            name.transform.SetParent(playerObject.transform);
+
+
             Destroy(playerObject.GetComponent<Player>());
             var dp = playerObject.AddComponent<Player>();
 
@@ -932,6 +954,7 @@ namespace Multiplayer {
         private void UpdatePlayerObject(PlayerData playerData, Vector3 position, string animationState, bool isFacingRight) {
             var playerObject = playerData.PlayerObject.transform.Find("RotateProxy/SpriteHolder");
             playerObject.transform.position = Vector3.Lerp(playerObject.transform.position, position, Time.deltaTime * 100f);
+            playerData.PlayerObject.transform.position = Vector3.Lerp(playerObject.transform.position, position, Time.deltaTime * 100f);
 
             var animator = playerObject.GetComponent<Animator>();
             if (animator == null) {
