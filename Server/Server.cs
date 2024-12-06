@@ -49,16 +49,33 @@ namespace Server {
                 var command = Console.ReadLine()?.Trim();
                 if (string.IsNullOrEmpty(command)) continue;
 
+                // Handle "pvp" commands
                 if (command.Equals("pvp 1", StringComparison.OrdinalIgnoreCase)) {
                     EnablePvP(true);
-                }
-                else if (command.Equals("pvp 0", StringComparison.OrdinalIgnoreCase)) {
+                } else if (command.Equals("pvp 0", StringComparison.OrdinalIgnoreCase)) {
                     EnablePvP(false);
-                } else {
+                }
+                  // Handle "tp" command
+                  else if (command.StartsWith("tp ", StringComparison.OrdinalIgnoreCase)) {
+                    var sceneName = command.Substring(3).Trim();
+                    if (!string.IsNullOrEmpty(sceneName)) {
+                        _writer = new NetDataWriter();
+                        _writer.Put("tp");
+                        _writer.Put(sceneName);
+                        foreach (var peer in _server.ConnectedPeerList) {
+                            peer.Send(_writer, DeliveryMethod.ReliableOrdered);
+                        }
+                    } else {
+                        Console.WriteLine("Invalid scene name. Usage: tp <SceneName>");
+                    }
+                }
+                  // Handle unknown commands
+                  else {
                     Console.WriteLine($"Unknown command: {command}");
                 }
             }
         }
+
 
         private static void EnablePvP(bool enable) {
             _isPvPEnabled = enable;
@@ -142,6 +159,7 @@ namespace Server {
                 case "Scene":
                     var scene = reader.GetString();
                     _players[peer.Id].scene = scene;
+                    Console.WriteLine($"{_players[peer.Id].name} on {scene}");
                     break;
                 case "GetName":
                     var playerId = reader.GetInt();

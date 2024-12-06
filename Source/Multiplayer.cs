@@ -758,6 +758,11 @@ namespace Multiplayer {
                     //ToastManager.Toast(_playerObjects[playerId].PlayerObject);
                     _playerObjects[playerId].PlayerObject.transform.Find("PlayerName").GetComponent<TextMeshPro>().text = name;
                     break;
+                case "tp":
+                    var tpSceneName = reader.GetString();
+                    GameCore.Instance?.GoToScene(tpSceneName);
+                    ToastManager.Toast($"Server Teleport All Player to {tpSceneName}");
+                    break;
                 default:
                     ToastManager.Toast(messageType);
                     break;
