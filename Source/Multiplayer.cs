@@ -233,9 +233,10 @@ namespace Multiplayer {
         void test2() {
             // Array of player object names
             ToastManager.Toast("test");
-            foreach(var x in _playerObjects) {
-                x.Value.PlayerObject.transform.Find("PlayerName").gameObject.SetActive(false);
-            }
+            GameCore.Instance.GoToSceneWithSavePoint("VR_Challenge_Boss_SpearHorseman");
+            //foreach(var x in _playerObjects) {
+            //    x.Value.PlayerObject.transform.Find("PlayerName").gameObject.SetActive(false);
+            //}
             //SceneManager.LoadScene("VR_Challenge_Hub");
             //if(minionPrefab == null && Player.i != null)
             //    StartCoroutine(Test2Coroutine());
@@ -718,7 +719,7 @@ namespace Multiplayer {
         }
 
         private void OnNetworkReceiveEvent(NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod) {
-            HandleReceivedData(reader);
+            HandleReceivedDataAsync(reader);
             reader.Recycle();
         }
 
@@ -726,7 +727,7 @@ namespace Multiplayer {
             ClearPlayerObjects();
         }
 
-        private void HandleReceivedData(NetDataReader reader) {
+        private async Task HandleReceivedDataAsync(NetDataReader reader) {
             var messageType = reader.GetString();
 
             switch (messageType) {
@@ -765,14 +766,38 @@ namespace Multiplayer {
                     break;
                 case "tp":
                     var tpSceneName = reader.GetString();
+
+                    // Go to the target scene
                     GameCore.Instance?.GoToScene(tpSceneName);
-                    ToastManager.Toast($"Server Teleport All Player to {tpSceneName}");
+
+                    // Wait until the game is ready for playing
+                    await WaitPlaying();
+
+                    // Set the revive save point after the game is ready
+                    var teleportData = new TeleportPointData {
+                        sceneName = tpSceneName,
+                        TeleportPosition = Player.i.transform.position
+                    };
+                    GameCore.Instance.SetReviveSavePoint(teleportData);
+
+                    // Notify players about the teleport
+                    ToastManager.Toast($"Server Teleported All Players to {tpSceneName}");
                     break;
+
                 default:
                     ToastManager.Toast(messageType);
                     break;
             }
         }
+
+        private async Task WaitPlaying() {
+            while (GameCore.Instance.currentCoreState != GameCore.GameCoreState.Playing ||
+                   Player.i.playerInput.currentStateType == PlayerInputStateType.Cutscene) {
+                // Wait for 300 milliseconds before rechecking
+                await Task.Delay(300);
+            }
+        }
+
 
         private void EnablePVP(NetDataReader reader) {
             isPVP = reader.GetBool();
