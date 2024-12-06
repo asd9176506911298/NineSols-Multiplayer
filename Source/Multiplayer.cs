@@ -723,6 +723,29 @@ namespace Multiplayer {
             isPVP = enable;
             pvp.Value = enable ? "PVP Enable" : "PVP Disable";
             ToastManager.Toast($"PvP {(enable ? "Enabled" : "Disabled")}");
+            if (isPVP) {
+                var effectReceiver = Player.i.transform
+                    .Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")
+                    ?.GetComponent<EffectReceiver>();
+
+                if (effectReceiver != null) {
+                    effectReceiver.effectType = EffectType.EnemyAttack |
+                                                  EffectType.BreakableBreaker |
+                                                  EffectType.ShieldBreak |
+                                                  EffectType.PostureDecreaseEffect;
+                }
+            } else {
+                var effectReceiver = Player.i.transform
+                    .Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")
+                    ?.GetComponent<EffectReceiver>();
+
+                if (effectReceiver != null) {
+                    effectReceiver.effectType &= ~(
+                                   EffectType.BreakableBreaker |
+                                   EffectType.ShieldBreak |
+                                   EffectType.PostureDecreaseEffect);
+                }
+            }
         }
 
         private void HandlePositionMessage(NetDataReader reader) {
