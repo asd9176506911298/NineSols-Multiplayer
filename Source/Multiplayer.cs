@@ -766,6 +766,8 @@ namespace Multiplayer {
                     break;
                 case "tp":
                     var tpSceneName = reader.GetString();
+                    // Notify players about the teleport
+                    ToastManager.Toast($"Server Teleported All Players to {tpSceneName}");
                     if (SceneManager.GetActiveScene().name == tpSceneName) break;
                     // Go to the target scene
                     GameCore.Instance?.GoToScene(tpSceneName);
@@ -778,10 +780,7 @@ namespace Multiplayer {
                         sceneName = tpSceneName,
                         TeleportPosition = Player.i.transform.position
                     };
-                    GameCore.Instance.SetReviveSavePoint(teleportData);
-
-                    // Notify players about the teleport
-                    ToastManager.Toast($"Server Teleported All Players to {tpSceneName}");
+                    GameCore.Instance?.SetReviveSavePoint(teleportData);
                     break;
 
                 default:
