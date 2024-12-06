@@ -887,7 +887,7 @@ namespace Multiplayer {
 
             // Optional: If the text container is too constrained, make sure it's wide enough
             // You can adjust the container's size or enable auto-sizing for the text
-            text.rectTransform.sizeDelta = new Vector2(200, 50);  // Adjust width and height based on needs
+            text.rectTransform.sizeDelta = new Vector2(200f, 50f);  // Adjust width and height based on needs
 
             Destroy(playerObject.GetComponent<Player>());
             var dp = playerObject.AddComponent<Player>();
