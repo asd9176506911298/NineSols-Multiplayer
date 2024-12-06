@@ -134,16 +134,6 @@ namespace Server {
                     }
                     Console.WriteLine(playersName);
                     BroadcastSystemMessage($"{name} connected. Player Count:{_server.ConnectedPeersCount}\n{playersName}", peer);
-
-                    _writer = new NetDataWriter();
-                    _writer.Put("Name");
-                    _writer.Put(peer.Id);
-                    _writer.Put(name);
-                    foreach (var p in _server.ConnectedPeerList) {
-                        if (p != peer) {
-                            p.Send(_writer, DeliveryMethod.ReliableOrdered);
-                        }
-                    }
                     break;
                 case "Leave":
                     var namee = reader.GetString();
@@ -152,6 +142,15 @@ namespace Server {
                 case "Scene":
                     var scene = reader.GetString();
                     _players[peer.Id].scene = scene;
+                    break;
+                case "GetName":
+                    var playerId = reader.GetInt();
+                    Console.WriteLine(_players[playerId].name);
+                    _writer = new NetDataWriter();
+                    _writer.Put("GetName");
+                    _writer.Put(playerId);
+                    _writer.Put(_players[playerId].name);
+                    peer.Send(_writer, DeliveryMethod.Unreliable);
                     break;
                 default:
                     Console.WriteLine($"Unknown message type: {messageType}");

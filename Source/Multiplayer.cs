@@ -704,10 +704,13 @@ namespace Multiplayer {
                 case "PvPEnabled":
                     enablePVP(reader);
                     break;
-                case "Name":
+                case "GetName":
                     var playerId = reader.GetInt();
                     var name = reader.GetString();
                     ToastManager.Toast($"11111111111 {playerId} {name}");
+                    _playerObjects[playerId].name = name;
+                    ToastManager.Toast(_playerObjects[playerId].PlayerObject);
+                    _playerObjects[playerId].PlayerObject.transform.Find("PlayerName").GetComponent<TextMeshPro>().text = name;
                     break;
                 default:
                     ToastManager.Toast(messageType);
@@ -745,6 +748,10 @@ namespace Multiplayer {
             // If the player object doesn't exist, create it
             if (!_playerObjects.TryGetValue(playerId, out var playerData)) {
                 if (hiddenObject == null) return;
+                _dataWriter.Reset();
+                _dataWriter.Put("GetName");
+                _dataWriter.Put(playerId);
+                _client.FirstPeer.Send(_dataWriter, DeliveryMethod.ReliableOrdered);
                 ToastManager.Toast(playerId); // Notify that a new player object is being created
                 playerData = CreatePlayerObject(playerId, position);
                 _playerObjects[playerId] = playerData;
@@ -862,9 +869,11 @@ namespace Multiplayer {
             var text = name.AddComponent<TextMeshPro>();
             text.text = "Yuki";
             text.fontSize = 300;
-            text.autoSizeTextContainer = true;
+            // Optionally, enable auto sizing if needed
+            // text.autoSizeTextContainer = true;
 
-            // Set the text position to the player's position
+            text.alignment = TextAlignmentOptions.Center;
+
             Vector3 playerPosition = playerObject.transform.position;
 
             // Adjust the text's position by adding an offset to the y-axis
@@ -873,6 +882,12 @@ namespace Multiplayer {
             // Set the parent of the text to the player object
             name.transform.SetParent(playerObject.transform);
 
+            // Ensure no rotation is applied to the text object (make it horizontal)
+            text.transform.rotation = Quaternion.identity;  // Reset any rotations
+
+            // Optional: If the text container is too constrained, make sure it's wide enough
+            // You can adjust the container's size or enable auto-sizing for the text
+            text.rectTransform.sizeDelta = new Vector2(200, 50);  // Adjust width and height based on needs
 
             Destroy(playerObject.GetComponent<Player>());
             var dp = playerObject.AddComponent<Player>();
