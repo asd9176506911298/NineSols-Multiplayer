@@ -815,7 +815,7 @@ namespace Multiplayer {
             }
         }
 
-        void makeDamage(GameObject playerObject, Player dp) {
+        private void MakeDamage(GameObject playerObject, Player dp) {
             var hitBoxManager = Player.i.transform.Find("RotateProxy/SpriteHolder/HitBoxManager")?.transform;
 
             if (hitBoxManager == null) {
@@ -823,72 +823,86 @@ namespace Multiplayer {
                 return;
             }
 
-            var monsterPath = "A1_S2_GameLevel/Room/Prefab/Gameplay5/[自然巡邏框架]/[MonsterBehaviorProvider] LevelDesign_CullingAndResetGroup/[MonsterBehaviorProvider] LevelDesign_Init_Scenario (看守的人)/StealthGameMonster_Spearman (1)";
-            var monsterCorePath = $"{monsterPath}/MonsterCore/Animator(Proxy)/Animator/LogicRoot/SwordSlashEffect/DamageArea";
-
-            //var monster = GameObject.Find(monsterPath)?.GetComponent<StealthGameMonster>();
+            // Get monster and binding parry references
             var monster = hiddenObject.GetComponent<MonsterBase>();
-            //var bindingParry = GameObject.Find(monsterCorePath)?.GetComponent<DamageDealer>()?.bindingParry;
-            var bindingParry = hiddenObject.transform.Find("MonsterCore/Animator(Proxy)/Animator/LogicRoot/SwordSlashEffect/DamageArea").GetComponent<DamageDealer>()?.bindingParry;
-            //ToastManager.Toast($"bind:{bindingParry}");
+            var bindingParry = hiddenObject.transform
+                .Find("MonsterCore/Animator(Proxy)/Animator/LogicRoot/SwordSlashEffect/DamageArea")
+                ?.GetComponent<DamageDealer>()?.bindingParry;
+
             if (monster == null || bindingParry == null) {
                 //ToastManager.Toast("Monster or binding parry not found.");
                 return;
             }
 
-            for (int i = 0; i < hitBoxManager.childCount; i++) {
-                var child = hitBoxManager.GetChild(i);
-                var name = child.name;
-                //ToastManager.Toast(name);
-
-                var hitBoxPath = $"RotateProxy/SpriteHolder/HitBoxManager/{name}";
+            // Process each child of HitBoxManager
+            foreach (Transform child in hitBoxManager) {
+                var hitBoxPath = $"RotateProxy/SpriteHolder/HitBoxManager/{child.name}";
                 var effectDealer = playerObject.transform.Find(hitBoxPath)?.GetComponent<EffectDealer>();
 
                 if (effectDealer == null) {
-                    //ToastManager.Toast($"EffectDealer not found for {name}");
+                    //ToastManager.Toast($"EffectDealer not found for {child.name}");
                     continue;
                 }
 
                 // Add and configure DamageDealer
-                var damageDealer = playerObject.transform.Find(hitBoxPath)?.gameObject.AddComponent<DamageDealer>();
+                var damageDealer = AddDamageDealer(playerObject, hitBoxPath, bindingParry, monster, effectDealer.FinalValue);
+
                 if (damageDealer != null) {
-                    damageDealer.type = DamageType.MonsterAttack;
-                    damageDealer.bindingParry = bindingParry;
-                    damageDealer.attacker = new Health(); //monster.health;
-                    damageDealer.damageAmount = effectDealer.FinalValue;
-
-                    //Traverse.Create(damageDealer).Field("_parriableOwner").SetValue(monster);
-                    //Traverse.Create(damageDealer).Field("owner").SetValue(monster);
-                    Traverse.Create(damageDealer).Field("_parriableOwner").SetValue(monster);
-                    Traverse.Create(damageDealer).Field("owner").SetValue(monster);
+                    ConfigureEffectDealer(effectDealer, dp, damageDealer);
+                    ConfigureEffectReceiver(playerObject, dp);
                 }
-
-                // Update EffectDealer
-                Traverse.Create(effectDealer).Field("valueProvider").SetValue(damageDealer);
-                Traverse.Create(effectDealer).Field("fxTimingOverrider").SetValue(damageDealer);
-                effectDealer.owner = dp;
-                effectDealer.DealerEffectOwner = dp;
-
-                // Update EffectReceiver
-                var effectReceiver = playerObject.transform
-                    .Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")
-                    ?.GetComponent<EffectReceiver>();
-
-                if (effectReceiver != null) {
-                    effectReceiver.Owner = dp;
-                    effectReceiver.effectType = EffectType.EnemyAttack |
-                                                  EffectType.BreakableBreaker |
-                                                  EffectType.ShieldBreak |
-                                                  EffectType.PostureDecreaseEffect;
-                } else {
-                    //ToastManager.Toast("EffectReceiver not found.");
-                }
-
-                // Set customDealers field
-                var customDealers = new List<DamageDealer> { damageDealer };
-                Traverse.Create(effectDealer).Field("customDealers").SetValue(customDealers.ToArray());
             }
         }
+
+        // Adds and configures a DamageDealer to a given path
+        private DamageDealer AddDamageDealer(GameObject playerObject, string hitBoxPath, ParriableAttackEffect bindingParry, MonsterBase monster, float damageAmount) {
+            var damageDealer = playerObject.transform.Find(hitBoxPath)?.gameObject.AddComponent<DamageDealer>();
+
+            if (damageDealer != null) {
+                damageDealer.type = DamageType.MonsterAttack;
+                damageDealer.bindingParry = bindingParry;
+                damageDealer.attacker = new Health(); // Add actual monster health if applicable
+                damageDealer.damageAmount = damageAmount;
+
+                Traverse.Create(damageDealer).Field("_parriableOwner").SetValue(monster);
+                Traverse.Create(damageDealer).Field("owner").SetValue(monster);
+            }
+
+            return damageDealer;
+        }
+
+        // Configures an EffectDealer with references to the DamageDealer
+        private void ConfigureEffectDealer(EffectDealer effectDealer, Player dp, DamageDealer damageDealer) {
+            Traverse.Create(effectDealer).Field("valueProvider").SetValue(damageDealer);
+            Traverse.Create(effectDealer).Field("fxTimingOverrider").SetValue(damageDealer);
+            effectDealer.owner = dp;
+            effectDealer.DealerEffectOwner = dp;
+
+            var customDealers = new List<DamageDealer> { damageDealer };
+            Traverse.Create(effectDealer).Field("customDealers").SetValue(customDealers.ToArray());
+        }
+
+        // Configures the EffectReceiver based on PvP status
+        private void ConfigureEffectReceiver(GameObject playerObject, Player dp) {
+            var effectReceiver = playerObject.transform
+                .Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")
+                ?.GetComponent<EffectReceiver>();
+
+            if (effectReceiver == null) return;
+
+            effectReceiver.Owner = dp;
+
+            if (isPVP) {
+                effectReceiver.effectType = EffectType.BreakableBreaker |
+                                            EffectType.ShieldBreak |
+                                            EffectType.PostureDecreaseEffect;
+            } else {
+                effectReceiver.effectType &= ~(EffectType.BreakableBreaker |
+                                               EffectType.ShieldBreak |
+                                               EffectType.PostureDecreaseEffect);
+            }
+        }
+
 
 
         private PlayerData CreatePlayerObject(int playerId, Vector3 position) {
@@ -929,7 +943,7 @@ namespace Multiplayer {
             AutoAttributeManager.AutoReference(playerObject);
             AutoAttributeManager.AutoReferenceAllChildren(playerObject);
 
-            makeDamage(playerObject, dp);
+            MakeDamage(playerObject, dp);
 
             //var pp = playerObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.AddComponent<DamageDealer>();
             //pp.type = DamageType.MonsterAttack;
