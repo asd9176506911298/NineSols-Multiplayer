@@ -7,11 +7,13 @@ public class PlayerData {
     public bool isFacingRight { get; set; }
     public int id { get; set; }
     public string name { get; set; }
+    public GameObject nameObject;
 
-    public PlayerData(GameObject obj, Vector3 pos, int id) {
+    public PlayerData(GameObject obj, Vector3 pos, int id, GameObject nameObject) {
         PlayerObject = obj;
         Position = pos;
         this.id = id;
+        this.nameObject = nameObject;
     }
 
     public PlayerData(int id,string name) {

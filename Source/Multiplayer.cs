@@ -966,7 +966,6 @@ namespace Multiplayer {
                 foreach (var effectDealer in effectDealers) {
                     // Get the path of the game object
                     var hitBoxPath = GetGameObjectPath(effectDealer.gameObject);
-                    ToastManager.Toast(hitBoxPath);
 
                     // Add DamageDealer to the game object
                     var damageDealer = AddDamageDealer(playerObject, hitBoxPath, bindingParry, monster, effectDealer.FinalValue);
@@ -996,7 +995,6 @@ namespace Multiplayer {
 
         // Configures an EffectDealer with references to the DamageDealer
         private void ConfigureEffectDealer(EffectDealer effectDealer, Player dp, DamageDealer damageDealer) {
-            ToastManager.Toast($"{effectDealer} {dp} {damageDealer}");
             Traverse.Create(effectDealer).Field("valueProvider").SetValue(damageDealer);
             Traverse.Create(effectDealer).Field("fxTimingOverrider").SetValue(damageDealer);
             effectDealer.owner = dp;
@@ -1139,15 +1137,26 @@ namespace Multiplayer {
             
 
             // Return the player data
-            return new PlayerData(playerObject, position, playerId);
+            return new PlayerData(playerObject, position, playerId,name);
         }
 
 
         private void UpdatePlayerObject(PlayerData playerData, Vector3 position, string animationState, bool isFacingRight) {
+            // Update the position of the player object
             var playerObject = playerData.PlayerObject.transform.Find("RotateProxy/SpriteHolder");
-            playerObject.transform.position = Vector3.Lerp(playerObject.transform.position, position, Time.deltaTime * 100f);
-            playerData.PlayerObject.transform.position = Vector3.Lerp(playerObject.transform.position, position, Time.deltaTime * 100f);
+            if (playerObject == null) {
+                Log.Error("Player object not found!");
+                return;
+            }
 
+            playerObject.transform.position = position;
+
+            // Update the position of nameObject
+            Vector3 nameObjectPosition = position;
+            nameObjectPosition.y += 50f;
+            playerData.nameObject.transform.position = nameObjectPosition;
+
+            // Update animation state
             var animator = playerObject.GetComponent<Animator>();
             if (animator == null) {
                 Log.Error("Animator not found on player object!");
@@ -1157,18 +1166,17 @@ namespace Multiplayer {
             if (animationState != currentAnimationState) {
                 currentAnimationState = animationState;
                 animator.CrossFade(animationState, 0.1f);
-            }
-
-            if (animator.GetCurrentAnimatorStateInfo(0).IsName(animationState) &&
-                animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1f) {
+            } else if (animator.GetCurrentAnimatorStateInfo(0).IsName(animationState) &&
+                       animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1f) {
                 animator.PlayInFixedTime(animationState, 0, 0f);
             }
 
-            //playerData.PlayerObject.GetComponent<Player>().Facing = isFacingRight ? Facings.Right : Facings.Left;
+            // Update facing direction
             var scale = playerObject.transform.localScale;
             scale.x = Mathf.Abs(scale.x) * (isFacingRight ? 1 : -1);
             playerObject.transform.localScale = scale;
         }
+
 
         private void OnDestroy() {
             _harmony.UnpatchSelf();
