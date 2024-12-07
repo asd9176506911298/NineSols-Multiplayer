@@ -513,7 +513,7 @@ namespace Multiplayer {
             // Wait until the game state is 'Playing'
             while (GameCore.Instance.currentCoreState != GameCore.GameCoreState.Playing || Player.i.playerInput.currentStateType == PlayerInputStateType.Cutscene) {
                 //ToastManager.Toast(GameCore.Instance.currentCoreState);
-                yield return new WaitForSeconds(0.3f); // Wait for the next frame before rechecking
+                yield return new WaitForSeconds(1f); // Wait for the next frame before rechecking
             }
 
             //yield return new WaitForSeconds(2f);
@@ -896,10 +896,11 @@ namespace Multiplayer {
         }
 
         private void MakeDamage(GameObject playerObject, Player dp) {
+            // Locate the HitBoxManager
             var hitBoxManager = Player.i.transform.Find("RotateProxy/SpriteHolder/HitBoxManager")?.transform;
 
             if (hitBoxManager == null) {
-                //ToastManager.Toast("HitBoxManager not found.");
+                // HitBoxManager not found
                 return;
             }
 
@@ -910,49 +911,56 @@ namespace Multiplayer {
                 ?.GetComponent<DamageDealer>()?.bindingParry;
 
             if (monster == null || bindingParry == null) {
-                //ToastManager.Toast("Monster or binding parry not found.");
+                // Monster or binding parry not found
                 return;
             }
 
-            // Process each child of HitBoxManager
+            // Iterate through children of HitBoxManager
             foreach (Transform child in hitBoxManager) {
                 var hitBoxPath = $"RotateProxy/SpriteHolder/HitBoxManager/{child.name}";
-                if(child.name == "ChargedAttackFront") {
-                    foreach(Transform c in playerObject.transform.Find(hitBoxPath)) {
-                        var d = $"{hitBoxPath}/{c.name}";
-                        var e = playerObject.transform.Find(d)?.GetComponent<EffectDealer>();
-                        ToastManager.Toast(e);
-                        if (e == null) {
-                            //ToastManager.Toast($"EffectDealer not found for {child.name}");
-                            continue;
-                        }
 
-                        // Add and configure DamageDealer
-                        var de = AddDamageDealer(playerObject, d, bindingParry, monster, e.FinalValue);
-
-                        if (de != null) {
-                            ConfigureEffectDealer(e, dp, de);
-                            ConfigureEffectReceiver(playerObject, dp);
-                        }
-                    }
+                // Special handling for "ChargedAttackFront"
+                if (child.name == "ChargedAttackFront") {
+                    ProcessChargedAttackFront(playerObject, hitBoxPath, bindingParry, monster, dp);
                     continue;
                 }
+
+                // Handle regular hit boxes
                 var effectDealer = playerObject.transform.Find(hitBoxPath)?.GetComponent<EffectDealer>();
-
                 if (effectDealer == null) {
-                    //ToastManager.Toast($"EffectDealer not found for {child.name}");
                     continue;
                 }
 
-                // Add and configure DamageDealer
                 var damageDealer = AddDamageDealer(playerObject, hitBoxPath, bindingParry, monster, effectDealer.FinalValue);
-
                 if (damageDealer != null) {
                     ConfigureEffectDealer(effectDealer, dp, damageDealer);
                     ConfigureEffectReceiver(playerObject, dp);
                 }
             }
         }
+
+        private void ProcessChargedAttackFront(GameObject playerObject, string hitBoxPath, ParriableAttackEffect bindingParry, MonsterBase monster, Player dp) {
+            var chargedAttackFront = playerObject.transform.Find(hitBoxPath);
+            if (chargedAttackFront == null) {
+                return;
+            }
+
+            foreach (Transform child in chargedAttackFront) {
+                var fullPath = $"{hitBoxPath}/{child.name}";
+                var effectDealer = playerObject.transform.Find(fullPath)?.GetComponent<EffectDealer>();
+
+                if (effectDealer == null) {
+                    continue;
+                }
+
+                var damageDealer = AddDamageDealer(playerObject, fullPath, bindingParry, monster, effectDealer.FinalValue);
+                if (damageDealer != null) {
+                    ConfigureEffectDealer(effectDealer, dp, damageDealer);
+                    ConfigureEffectReceiver(playerObject, dp);
+                }
+            }
+        }
+
 
         // Adds and configures a DamageDealer to a given path
         private DamageDealer AddDamageDealer(GameObject playerObject, string hitBoxPath, ParriableAttackEffect bindingParry, MonsterBase monster, float damageAmount) {
