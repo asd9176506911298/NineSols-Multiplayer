@@ -917,6 +917,26 @@ namespace Multiplayer {
             // Process each child of HitBoxManager
             foreach (Transform child in hitBoxManager) {
                 var hitBoxPath = $"RotateProxy/SpriteHolder/HitBoxManager/{child.name}";
+                if(child.name == "ChargedAttackFront") {
+                    foreach(Transform c in playerObject.transform.Find(hitBoxPath)) {
+                        var d = $"{hitBoxPath}/{c.name}";
+                        var e = playerObject.transform.Find(d)?.GetComponent<EffectDealer>();
+                        ToastManager.Toast(e);
+                        if (e == null) {
+                            //ToastManager.Toast($"EffectDealer not found for {child.name}");
+                            continue;
+                        }
+
+                        // Add and configure DamageDealer
+                        var de = AddDamageDealer(playerObject, d, bindingParry, monster, e.FinalValue);
+
+                        if (de != null) {
+                            ConfigureEffectDealer(e, dp, de);
+                            ConfigureEffectReceiver(playerObject, dp);
+                        }
+                    }
+                    continue;
+                }
                 var effectDealer = playerObject.transform.Find(hitBoxPath)?.GetComponent<EffectDealer>();
 
                 if (effectDealer == null) {
