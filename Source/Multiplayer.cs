@@ -477,17 +477,6 @@ namespace Multiplayer {
             }
         }
 
-        string GetGameObjectPath(GameObject obj) {
-            string path = obj.name;
-            Transform current = obj.transform;
-
-            while (current.parent != null) {
-                current = current.parent;
-                path = current.name + "/" + path;
-            }
-
-            return path;
-        }
 #endif
 
         private void InitializeNetworking() {
@@ -936,6 +925,18 @@ namespace Multiplayer {
                 Destroy(playerData.PlayerObject);
                 _playerObjects.Remove(playerId);
             }
+        }
+
+        string GetGameObjectPath(GameObject obj) {
+            string path = obj.name;
+            Transform current = obj.transform;
+
+            while (current.parent != null) {
+                current = current.parent;
+                path = current.name + "/" + path;
+            }
+
+            return path;
         }
 
         private void MakeDamage(GameObject playerObject, Player dp) {
