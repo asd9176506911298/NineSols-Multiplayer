@@ -58,7 +58,7 @@ namespace Server {
                         peer.Send(_writer, DeliveryMethod.ReliableOrdered);
                     }
 
-                    Task.Delay(3000).Wait(); // Blocks the current thread for 5 
+                    Task.Delay(1000).Wait(); // Blocks the current thread for 5 
                     _server.Stop();
                     Task.Delay(1000).Wait(); // Blocks the current thread for 5 
                     Environment.Exit(0);

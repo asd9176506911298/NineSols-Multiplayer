@@ -539,24 +539,52 @@ namespace Multiplayer {
             _localPlayerId = -1;
             ClearPlayerObjects();
 
-            if (Player.i == null) return;
+            // Start a coroutine to check the connection status
+            StartCoroutine(CheckConnectionStatus(success => {
+                if (!success) {
+                    ToastManager.Toast("Connection failed.");
+                    return;
+                }
 
-            var effectReceiver = Player.i.transform
-                        .Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")
-                        .GetComponent<EffectReceiver>();
-            if (effectReceiver != null) {
-                effectReceiver.effectType = EffectType.EnemyAttack |
-                                            EffectType.BreakableBreaker |
-                                            EffectType.ShieldBreak |
-                                            EffectType.PostureDecreaseEffect;
+                if (Player.i == null) return;
+
+                var effectReceiver = Player.i.transform
+                            .Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")
+                            ?.GetComponent<EffectReceiver>();
+                if (effectReceiver != null) {
+                    effectReceiver.effectType = EffectType.EnemyAttack |
+                                                EffectType.BreakableBreaker |
+                                                EffectType.ShieldBreak |
+                                                EffectType.PostureDecreaseEffect;
+                }
+
+                if (minionPrefab == null && Player.i != null) {
+                    StartCoroutine(PreloadMinionPrefab());
+                } else {
+                    //ToastManager.Toast("Minion prefab already loaded.");
+                }
+            }));
+        }
+
+        // Coroutine to check connection status
+        private IEnumerator CheckConnectionStatus(Action<bool> callback) {
+            float timeout = 2f; // Time to wait for a successful connection
+            float elapsedTime = 0f;
+
+            while (!(_client.FirstPeer?.ConnectionState == ConnectionState.Connected) && elapsedTime < timeout) {
+                elapsedTime += Time.deltaTime;
+                yield return null;
             }
 
-            if (minionPrefab == null && Player.i != null)
-                StartCoroutine(PreloadMinionPrefab());
-            else {
-                //ToastManager.Toast("ddddddddnull");
+            bool isConnected = _client.FirstPeer?.ConnectionState == ConnectionState.Connected;
+            callback(isConnected);
+
+            if (!isConnected) {
+                _client.Stop(); // Clean up client on failure
             }
         }
+
+
 
         private IEnumerator PreloadMinionPrefab() {
             // Execute the scene loading/unloading coroutine
