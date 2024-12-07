@@ -554,7 +554,7 @@ namespace Multiplayer {
             if (minionPrefab == null && Player.i != null)
                 StartCoroutine(PreloadMinionPrefab());
             else {
-                ToastManager.Toast("ddddddddnull");
+                //ToastManager.Toast("ddddddddnull");
             }
         }
 
@@ -789,7 +789,10 @@ namespace Multiplayer {
                     };
                     GameCore.Instance?.SetReviveSavePoint(teleportData);
                     break;
-
+                case "stop":
+                    ToastManager.Toast("Server Owner Stop Server");
+                    DisconnectFromServer();
+                    break;
                 default:
                     ToastManager.Toast(messageType);
                     break;
