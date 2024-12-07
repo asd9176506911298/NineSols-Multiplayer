@@ -511,9 +511,16 @@ namespace Multiplayer {
             
 
             // Wait until the game state is 'Playing'
-            while (GameCore.Instance.currentCoreState != GameCore.GameCoreState.Playing || Player.i.playerInput.currentStateType == PlayerInputStateType.Cutscene) {
+            while (GameCore.Instance.currentCoreState != GameCore.GameCoreState.Playing) {
                 //ToastManager.Toast(GameCore.Instance.currentCoreState);
-                yield return new WaitForSeconds(1f); // Wait for the next frame before rechecking
+                yield return new WaitForSeconds(0.3f); // Wait for the next frame before rechecking
+                //ToastManager.Toast("123");
+            }
+
+            while (Player.i.playerInput.currentStateType != PlayerInputStateType.Action) {
+                //ToastManager.Toast(GameCore.Instance.currentCoreState);
+                yield return new WaitForSeconds(0.3f); // Wait for the next frame before rechecking
+                //ToastManager.Toast("456");
             }
 
             //yield return new WaitForSeconds(2f);
@@ -686,7 +693,7 @@ namespace Multiplayer {
                     _sendTimer = 0;
                 }
             }
-
+            //ToastManager.Toast($"{GameCore.Instance.currentCoreState} {Player.i.playerInput.currentStateType}");
             _client.PollEvents();
         }
 
