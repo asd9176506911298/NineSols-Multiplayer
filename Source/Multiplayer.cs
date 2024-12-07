@@ -233,7 +233,12 @@ namespace Multiplayer {
         void test2() {
             // Array of player object names
             ToastManager.Toast("test");
-            GameCore.Instance.GoToSceneWithSavePoint("VR_Challenge_Boss_SpearHorseman");
+            foreach(Transform x in GameObject.Find("GameCore(Clone)/RCG LifeCycle/PPlayer/RotateProxy/SpriteHolder/HitBoxManager").transform) {
+                foreach(var z in x.GetComponentsInChildren<EffectDealer>()) {
+                    ToastManager.Toast(z.name);
+                }
+            }
+            //GameCore.Instance.GoToSceneWithSavePoint("VR_Challenge_Boss_SpearHorseman");
             //foreach(var x in _playerObjects) {
             //    x.Value.PlayerObject.transform.Find("PlayerName").gameObject.SetActive(false);
             //}
