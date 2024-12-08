@@ -225,19 +225,45 @@ namespace Multiplayer {
             SceneManager.LoadScene(SceneManager.GetActiveScene().name);
         }
 
-        
-
-        
-
-
         void test2() {
             // Array of player object names
-            ToastManager.Toast("test");
-            foreach(Transform x in GameObject.Find("GameCore(Clone)/RCG LifeCycle/PPlayer/RotateProxy/SpriteHolder/HitBoxManager").transform) {
-                foreach(var z in x.GetComponentsInChildren<EffectDealer>()) {
-                    ToastManager.Toast(z.name);
-                }
-            }
+            ToastManager.Toast(":goodtimefrog: Za Warudo");
+
+
+            //var sp = GameObject.Find("GameCore(Clone)/RCG LifeCycle/PPlayer/RotateProxy/SpriteHolder/customObject").GetComponent<SpriteRenderer>().sprite;
+            ////ToastManager.Toast(sp);
+
+            //foreach (var x in GameObject.Find("A1_S2_GameLevel").GetComponentsInChildren<SpriteRenderer>()) {
+            //    foreach (var a in x.GetComponentsInChildren<Animator>())
+            //        a.enabled = false;
+
+            //    foreach (var s in x.GetComponentsInChildren<SpriteRenderer>()) {
+            //        s.sprite = sp;
+
+            //        // Scale up the sprite if necessary
+            //        float scaleFactor = 3.0f; // Adjust this value as needed
+            //        s.transform.localScale = new Vector3(scaleFactor, scaleFactor, 1);
+            //    }
+            //}
+
+            //foreach (var x in GameObject.FindObjectsOfType<MonsterBase>()) {
+            //    foreach (var a in x.GetComponentsInChildren<Animator>())
+            //        a.enabled = false;
+
+            //    foreach (var s in x.GetComponentsInChildren<SpriteRenderer>()) {
+            //        s.sprite = sp;
+
+            //        // Scale up the sprite if necessary
+            //        float scaleFactor = 5.0f; // Adjust this value as needed
+            //        s.transform.localScale = new Vector3(scaleFactor, scaleFactor, 1);
+            //    }
+            //}
+
+            //foreach(Transform x in GameObject.Find("GameCore(Clone)/RCG LifeCycle/PPlayer/RotateProxy/SpriteHolder/HitBoxManager").transform) {
+            //    foreach(var z in x.GetComponentsInChildren<EffectDealer>()) {
+            //        ToastManager.Toast(z.name);
+            //    }
+            //}
             //GameCore.Instance.GoToSceneWithSavePoint("VR_Challenge_Boss_SpearHorseman");
             //foreach(var x in _playerObjects) {
             //    x.Value.PlayerObject.transform.Find("PlayerName").gameObject.SetActive(false);
@@ -1026,7 +1052,14 @@ namespace Multiplayer {
             }
         }
 
-
+        void DestroyChildObjects(GameObject parent, params string[] paths) {
+            foreach (var path in paths) {
+                var child = parent.transform.Find(path);
+                if (child != null) {
+                    Destroy(child.gameObject);
+                }
+            }
+        }
 
         private PlayerData CreatePlayerObject(int playerId, Vector3 position) {
             // Instantiate the player object
@@ -1065,6 +1098,12 @@ namespace Multiplayer {
 
             Destroy(playerObject.GetComponent<Player>());
             var dp = playerObject.AddComponent<Player>();
+
+
+            DestroyChildObjects(playerObject,
+        "RotateProxy/SpriteHolder/HitBoxManager/Foo",
+        "RotateProxy/SpriteHolder/HitBoxManager/FooInit",
+        "RotateProxy/SpriteHolder/HitBoxManager/FooExplode");
 
             AutoAttributeManager.AutoReference(playerObject);
             AutoAttributeManager.AutoReferenceAllChildren(playerObject);
