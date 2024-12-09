@@ -560,30 +560,48 @@ namespace Multiplayer {
             ClearPlayerObjects();
 
             // Start a coroutine to check the connection status
-            StartCoroutine(CheckConnectionStatus(success => {
-                if (!success) {
-                    ToastManager.Toast("Connection failed.");
+            StartCoroutine(CheckConnectionStatus(OnConnectionStatusChecked));
+        }
+
+        private void OnConnectionStatusChecked(bool success) {
+            if (!success) {
+                ToastManager.Toast("Connection failed.");
+                return;
+            }
+
+            if (Player.i == null) return;
+
+            ConfigurePlayerEffectReceiver();
+            LoadMinionPrefab();
+        }
+
+        private void ConfigurePlayerEffectReceiver() {
+            var effectReceiver = Player.i.transform
+                .Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")
+                ?.GetComponent<EffectReceiver>();
+
+            if (effectReceiver != null) {
+                effectReceiver.effectType = EffectType.EnemyAttack |
+                                            EffectType.BreakableBreaker |
+                                            EffectType.ShieldBreak |
+                                            EffectType.PostureDecreaseEffect;
+            }
+        }
+
+        private void LoadMinionPrefab() {
+            var allObjects = Resources.FindObjectsOfTypeAll<MonsterBase>();
+            foreach (var obj in allObjects) {
+                if (obj.name == "StealthGameMonster_Minion_prefab") {
+                    minionPrefab = obj.gameObject;
+                    AutoAttributeManager.AutoReference(minionPrefab);
+                    AutoAttributeManager.AutoReferenceAllChildren(minionPrefab);
                     return;
                 }
+            }
 
-                if (Player.i == null) return;
-
-                var effectReceiver = Player.i.transform
-                            .Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")
-                            ?.GetComponent<EffectReceiver>();
-                if (effectReceiver != null) {
-                    effectReceiver.effectType = EffectType.EnemyAttack |
-                                                EffectType.BreakableBreaker |
-                                                EffectType.ShieldBreak |
-                                                EffectType.PostureDecreaseEffect;
-                }
-
-                if (minionPrefab == null && Player.i != null) {
-                    StartCoroutine(PreloadMinionPrefab());
-                } else {
-                    //ToastManager.Toast("Minion prefab already loaded.");
-                }
-            }));
+            if (minionPrefab == null) {
+                StartCoroutine(PreloadMinionPrefab());
+            }
         }
 
         // Coroutine to check connection status
