@@ -32,8 +32,8 @@ namespace Multiplayer {
         }
 
         [HarmonyPatch(typeof(ParriableAttackEffect), "EffectCountered")]
-        [HarmonyPrefix]
-        public static bool hookEffectCountered(ParriableAttackEffect __instance, PlayerParryState parryState, EffectHitData hitData) {
+        [HarmonyPostfix]
+        public static void hookEffectCountered(ParriableAttackEffect __instance, PlayerParryState parryState, EffectHitData hitData) {
             ToastManager.Toast(hitData.dealer.transform.root.gameObject);
 
             GameObject rootObject = hitData.dealer.transform.root.gameObject;
@@ -55,7 +55,6 @@ namespace Multiplayer {
             }
             //ToastManager.Toast($"result:{__result}");
             Multiplayer.Instance.SendRecoverableDamage(matchingPlayerData.id, hitData.dealer.FinalValue);
-            return true; // Allow the original method to execute
         }
 
         //[HarmonyPatch(typeof(ParryCounterDefenseState), "Parried")]
