@@ -982,7 +982,7 @@ namespace Multiplayer {
         }
 
         private void HandleRecoverableDamage(NetDataReader reader) {
-            ToastManager.Toast("RecoverableDamage");
+            //ToastManager.Toast("RecoverableDamage");
             var playerId = reader.GetInt();
             var internalDamage = reader.GetFloat();
 

@@ -35,7 +35,7 @@ namespace Multiplayer {
         public static void HookParried(ParryCounterDefenseState __instance, EffectHitData hitData, ParryParam param, DamageDealer bindDamage, ref bool __result) {
 
             if (__result) {
-                ToastManager.Toast(bindDamage.transform.parent.root.gameObject);
+                //ToastManager.Toast(bindDamage.transform.parent.root.gameObject);
 
                 GameObject rootObject = bindDamage.transform.parent.root.gameObject;
 
@@ -49,11 +49,11 @@ namespace Multiplayer {
                     }
                 }
 
-                if (matchingPlayerData != null) {
-                    ToastManager.Toast($"Found PlayerData: ID = {matchingPlayerData.id}, Name = {matchingPlayerData.name}");
-                } else {
-                    ToastManager.Toast("PlayerData not found for the given GameObject.");
-                }
+                //if (matchingPlayerData != null) {
+                //    ToastManager.Toast($"Found PlayerData: ID = {matchingPlayerData.id}, Name = {matchingPlayerData.name}");
+                //} else {
+                //    ToastManager.Toast("PlayerData not found for the given GameObject.");
+                //}
                 //ToastManager.Toast($"result:{__result}");
                 Multiplayer.Instance.SendRecoverableDamage(matchingPlayerData.id, hitData.dealer.FinalValue);
             }
