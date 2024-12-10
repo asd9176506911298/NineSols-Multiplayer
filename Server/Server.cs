@@ -228,9 +228,20 @@ namespace Server {
 
             Console.WriteLine($"RecoverableDamage - Player: {playerId}, InternalDamage: {damageValue}");
 
-            if (_players.ContainsKey(playerId)) {
-                BroadcastHealthUpdate("RecoverableDamage", playerId, damageValue);
+            foreach(var x in _players.Values) {
+                if(x.PlayerId == playerId) {
+                    //BroadcastHealthUpdate("RecoverableDamage", playerId, damageValue);
+                    _writer = new NetDataWriter();
+                    _writer.Put("RecoverableDamage"); // Specify the update type
+                    _writer.Put(playerId);
+                    _writer.Put(damageValue);
+
+                    x.Peer.Send(_writer, DeliveryMethod.Unreliable);
+                }
             }
+
+               
+            
         }
 
         private static void BroadcastHealthUpdate(string updateType, int playerId, float damageValue) {
