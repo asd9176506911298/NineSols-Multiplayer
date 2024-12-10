@@ -42,8 +42,6 @@ namespace Multiplayer {
 
         GameObject minionPrefab = null;
 
-        //private TitlescreenModifications titlescreenModifications = new();
-
         public readonly Dictionary<int, PlayerData> _playerObjects = new();
         private int _localPlayerId = -1;
         private const float SendInterval = 0.02f;
@@ -56,8 +54,6 @@ namespace Multiplayer {
             Instance = this;
             Log.Init(Logger);
             try {
-                NineSolsAPICore.Preloader.AddPreloadClass(this);
-
                 RCGLifeCycle.DontDestroyForever(gameObject);
 
                 _harmony = Harmony.CreateAndPatchAll(typeof(Multiplayer).Assembly);
@@ -1245,7 +1241,6 @@ namespace Multiplayer {
         private void OnDestroy() {
             _harmony.UnpatchSelf();
             SceneManager.sceneLoaded -= OnSceneLoaded;
-            //titlescreenModifications.Unload();
             DisconnectFromServer();
         }
     }
