@@ -555,7 +555,7 @@ namespace Multiplayer {
             if (_client.IsRunning) return;
 
             if (Player.i == null) {
-                ToastManager.Toast("Player haven't create. Enter game try again");
+                ToastManager.Toast("Yi haven't create. Enter game try join server again");
                 return;
             }
 
