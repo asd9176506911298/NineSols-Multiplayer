@@ -597,6 +597,12 @@ namespace Multiplayer {
                     minionPrefab = obj.gameObject;
                     AutoAttributeManager.AutoReference(minionPrefab);
                     AutoAttributeManager.AutoReferenceAllChildren(minionPrefab);
+
+                    var levelAwakeList = minionPrefab.GetComponentsInChildren<ILevelAwake>(true);
+                    for (var i = levelAwakeList.Length - 1; i >= 0; i--) {
+                        var context = levelAwakeList[i];
+                        try { context.EnterLevelAwake(); } catch (Exception ex) { Log.Error(ex.StackTrace); }
+                    }
                     return;
                 }
             }
@@ -985,6 +991,8 @@ namespace Multiplayer {
             //ToastManager.Toast("RecoverableDamage");
             var playerId = reader.GetInt();
             var internalDamage = reader.GetFloat();
+
+            ToastManager.Toast($"HandleRecoverableDamage: {playerId} {_localPlayerId}");
 
             if (playerId == _localPlayerId && Player.i != null) {
                 Player.i.health.ReceiveRecoverableDamage(internalDamage);
