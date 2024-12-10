@@ -988,7 +988,8 @@ namespace Multiplayer {
 
             if (playerId == _localPlayerId && Player.i != null) {
                 Player.i.health.ReceiveRecoverableDamage(internalDamage);
-                Player.i.ChangeState(PlayerStateType.Hurt, true);
+                Player.i.ChangeState(PlayerStateType.LieDown, true);
+                Player.i.velocityModifierManager.attackKnockbackModifier.ApplyVelocity(400f, 0f);
             }
         }
 
