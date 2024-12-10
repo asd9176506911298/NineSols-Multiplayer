@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using ChartUtil;
+using HarmonyLib;
 using NineSolsAPI;
 using UnityEngine;
 
@@ -27,6 +28,33 @@ namespace Multiplayer {
             }
 
             return true; // Allow the original method to execute
+        }
+
+        [HarmonyPatch(typeof(ParryCounterDefenseState), "Parried")]
+        [HarmonyPostfix]
+        public static void HookParried(ParryCounterDefenseState __instance, EffectHitData hitData, ParryParam param, DamageDealer bindDamage) {
+
+            ToastManager.Toast(bindDamage.transform.parent.root.gameObject);
+
+            GameObject rootObject = bindDamage.transform.parent.root.gameObject;
+
+            // Find the PlayerData whose PlayerObject matches the rootObject
+            PlayerData matchingPlayerData = null;
+
+            foreach (var playerDataEntry in Multiplayer.Instance._playerObjects.Values) {
+                if (playerDataEntry.PlayerObject == rootObject) {
+                    matchingPlayerData = playerDataEntry;
+                    break;
+                }
+            }
+
+            if (matchingPlayerData != null) {
+                ToastManager.Toast($"Found PlayerData: ID = {matchingPlayerData.id}, Name = {matchingPlayerData.name}");
+            } else {
+                ToastManager.Toast("PlayerData not found for the given GameObject.");
+            }
+            
+            Multiplayer.Instance.SendRecoverableDamage(matchingPlayerData.id, hitData.dealer.FinalValue / 2);
         }
     }
 }

@@ -173,6 +173,9 @@ namespace Server {
                 case "DecreaseHealth":
                     HandleDecreaseHealth(peer, reader);
                     break;
+                case "RecoverableDamage":
+                    HandleRecoverableDamage(peer, reader);
+                    break;
                 case "Join":
                     var name = reader.GetString();
                     _players[peer.Id].name = name;
@@ -215,13 +218,24 @@ namespace Server {
             Console.WriteLine($"DecreaseHealth - Player: {playerId}, Damage: {damageValue}");
 
             if (_players.ContainsKey(playerId)) {
-                BroadcastHealthUpdate(playerId, damageValue);
+                BroadcastHealthUpdate("DecreaseHealth", playerId, damageValue);
             }
         }
 
-        private static void BroadcastHealthUpdate(int playerId, float damageValue) {
+        private static void HandleRecoverableDamage(NetPeer peer, NetPacketReader reader) {
+            var playerId = reader.GetInt();
+            var damageValue = reader.GetFloat();
+
+            Console.WriteLine($"RecoverableDamage - Player: {playerId}, InternalDamage: {damageValue}");
+
+            if (_players.ContainsKey(playerId)) {
+                BroadcastHealthUpdate("RecoverableDamage", playerId, damageValue);
+            }
+        }
+
+        private static void BroadcastHealthUpdate(string updateType, int playerId, float damageValue) {
             _writer = new NetDataWriter();
-            _writer.Put("DecreaseHealth");
+            _writer.Put(updateType); // Specify the update type
             _writer.Put(playerId);
             _writer.Put(damageValue);
 

@@ -778,6 +778,19 @@ namespace Multiplayer {
             _client.FirstPeer.Send(_dataWriter, DeliveryMethod.Unreliable);
         }
 
+        public void SendRecoverableDamage(int playerId, float value) {
+            if (_client.FirstPeer == null) {
+                ToastManager.Toast("Not connected to server.");
+                return;
+            }
+
+            _dataWriter.Reset();
+            _dataWriter.Put("RecoverableDamage");
+            _dataWriter.Put(playerId);
+            _dataWriter.Put(value);
+            _client.FirstPeer.Send(_dataWriter, DeliveryMethod.Unreliable);
+        }
+
         private void SendPosition() {
             if (_localPlayerId == -1 || Player.i == null) return;
 
@@ -824,6 +837,9 @@ namespace Multiplayer {
                     break;
                 case "DecreaseHealth":
                     HandleDecreaseHealth(reader);
+                    break;
+                case "RecoverableDamage":
+                    HandleRecoverableDamage(reader);
                     break;
                 case "DestroyDisconnectObject":
                     HandleDisconnectObject(reader);
@@ -961,6 +977,17 @@ namespace Multiplayer {
 
             if (playerId == _localPlayerId && Player.i != null) {
                 Player.i.health.ReceiveDOT_Damage(damage);
+                Player.i.ChangeState(PlayerStateType.Hurt, true);
+            }
+        }
+
+        private void HandleRecoverableDamage(NetDataReader reader) {
+            ToastManager.Toast("RecoverableDamage");
+            var playerId = reader.GetInt();
+            var internalDamage = reader.GetFloat();
+
+            if (playerId == _localPlayerId && Player.i != null) {
+                Player.i.health.ReceiveRecoverableDamage(internalDamage);
                 Player.i.ChangeState(PlayerStateType.Hurt, true);
             }
         }
