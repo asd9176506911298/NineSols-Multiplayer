@@ -225,10 +225,11 @@ namespace Multiplayer {
             SceneManager.LoadScene(SceneManager.GetActiveScene().name);
         }
 
+       
+
         void test2() {
             // Array of player object names
             ToastManager.Toast(":goodtimefrog: Za Warudo");
-
 
             //var sp = GameObject.Find("GameCore(Clone)/RCG LifeCycle/PPlayer/RotateProxy/SpriteHolder/customObject").GetComponent<SpriteRenderer>().sprite;
             ////ToastManager.Toast(sp);
@@ -552,6 +553,11 @@ namespace Multiplayer {
 
         private void ConnectToServer() {
             if (_client.IsRunning) return;
+
+            if (Player.i == null) {
+                ToastManager.Toast("Player haven't create. Enter game try again");
+                return;
+            }
 
             ToastManager.Toast("Connecting to server...");
             _client.Start();
