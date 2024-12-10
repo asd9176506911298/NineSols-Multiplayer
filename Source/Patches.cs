@@ -32,29 +32,31 @@ namespace Multiplayer {
 
         [HarmonyPatch(typeof(ParryCounterDefenseState), "Parried")]
         [HarmonyPostfix]
-        public static void HookParried(ParryCounterDefenseState __instance, EffectHitData hitData, ParryParam param, DamageDealer bindDamage) {
+        public static void HookParried(ParryCounterDefenseState __instance, EffectHitData hitData, ParryParam param, DamageDealer bindDamage, ref bool __result) {
 
-            ToastManager.Toast(bindDamage.transform.parent.root.gameObject);
+            if (__result) {
+                ToastManager.Toast(bindDamage.transform.parent.root.gameObject);
 
-            GameObject rootObject = bindDamage.transform.parent.root.gameObject;
+                GameObject rootObject = bindDamage.transform.parent.root.gameObject;
 
-            // Find the PlayerData whose PlayerObject matches the rootObject
-            PlayerData matchingPlayerData = null;
+                // Find the PlayerData whose PlayerObject matches the rootObject
+                PlayerData matchingPlayerData = null;
 
-            foreach (var playerDataEntry in Multiplayer.Instance._playerObjects.Values) {
-                if (playerDataEntry.PlayerObject == rootObject) {
-                    matchingPlayerData = playerDataEntry;
-                    break;
+                foreach (var playerDataEntry in Multiplayer.Instance._playerObjects.Values) {
+                    if (playerDataEntry.PlayerObject == rootObject) {
+                        matchingPlayerData = playerDataEntry;
+                        break;
+                    }
                 }
-            }
 
-            if (matchingPlayerData != null) {
-                ToastManager.Toast($"Found PlayerData: ID = {matchingPlayerData.id}, Name = {matchingPlayerData.name}");
-            } else {
-                ToastManager.Toast("PlayerData not found for the given GameObject.");
+                if (matchingPlayerData != null) {
+                    ToastManager.Toast($"Found PlayerData: ID = {matchingPlayerData.id}, Name = {matchingPlayerData.name}");
+                } else {
+                    ToastManager.Toast("PlayerData not found for the given GameObject.");
+                }
+                //ToastManager.Toast($"result:{__result}");
+                Multiplayer.Instance.SendRecoverableDamage(matchingPlayerData.id, hitData.dealer.FinalValue);
             }
-            
-            Multiplayer.Instance.SendRecoverableDamage(matchingPlayerData.id, hitData.dealer.FinalValue / 2);
         }
     }
 }
