@@ -128,7 +128,7 @@ namespace Multiplayer {
             rect.pivot = new Vector2(0, 0); // Set pivot to bottom-left corner
             rect.anchoredPosition = new Vector2(0, 0); // Set position to (0, 0) relativ
 
-            RCGLifeCycle.DontDestroyForever(chatCanvas);
+            //RCGLifeCycle.DontDestroyForever(chatCanvas);
         }
 
         void SetPlayerNameSize() {
@@ -789,43 +789,37 @@ namespace Multiplayer {
             }
 
             _client.PollEvents();
-            // Toggle chatCanvas with T
-            if (Input.GetKeyDown(KeyCode.T)) {
-                var input = inputField.GetComponent<InputField>();
+            var input = inputField.GetComponent<InputField>(); // Fetch InputField once
 
-                // Stop any running coroutine when toggling chat
+            if (Input.GetKeyDown(KeyCode.Return)) {
                 if (disableScrollCoroutine != null) {
                     StopCoroutine(disableScrollCoroutine);
                     disableScrollCoroutine = null;
                 }
 
+                // Ensure input field is visible when focusing
                 if (!input.isFocused) {
-                    scrollView.SetActive(true);
-                    inputField.SetActive(true);
-
-                    input.ActivateInputField(); // Focus the input field
+                    scrollView.SetActive(true);  // Ensure the scroll view is shown
+                    inputField.SetActive(true);  // Ensure the input field is visible
+                    input.ActivateInputField();  // Focus the input field
                 }
-            }
 
-            // Send message when Enter is pressed
-            if (scrollView.activeSelf && inputField.activeSelf && Input.GetKeyDown(KeyCode.Return)) {
-                var input = inputField.GetComponent<InputField>();
-                string message = input.text;
+                // Now, directly check for Enter key and process message sending
+                string message = input.text.Trim(); // Remove leading/trailing spaces
 
                 if (!string.IsNullOrWhiteSpace(message)) {
-                    SendMessageToChat(message);
-                    input.text = string.Empty; // Clear input field
-                    input.ActivateInputField(); // Refocus input field
-                } else {
-                    inputField.SetActive(false);
-
-                    // Start or restart the coroutine to disable the scrollView after a delay
-                    if (disableScrollCoroutine != null) {
-                        StopCoroutine(disableScrollCoroutine);
-                    }
+                    // If the message is valid, send it to the chat
+                    SendMessageToChat(message); // Call SendMessageToChat with the message
+                    input.text = string.Empty; // Clear the input field after sending
+                    ToastManager.Toast("111");
+                    inputField.SetActive(false);  // Ensure the input field is visible
                     disableScrollCoroutine = StartCoroutine(DisableScrollViewAfterDelay(2f));
                 }
+
+                // Make sure to keep the input field focused after processing
+                input.ActivateInputField();
             }
+
         }
 
         // Coroutine to disable the scrollView after a delay
