@@ -17,6 +17,6 @@
 
 # Server Command
 - say text // say hello
-- tp sceneName example     tp VR_Challenge_Hub // tpeleprot All Playee to Memory Of Boss Room
+- tp sceneName example     tp VR_Challenge_Hub // tpeleprot All Player to Memory Of Boss Room
 - pvp 0 pvp 1 // pvp disable pvp enable
 - stop // shutdown server
