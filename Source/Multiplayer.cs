@@ -1,6 +1,7 @@
 ﻿
 using BepInEx;
 using BepInEx.Configuration;
+using Dialogue;
 using HarmonyLib;
 using LiteNetLib;
 using LiteNetLib.Utils;
@@ -584,13 +585,48 @@ namespace Multiplayer {
             // Start a coroutine to check the connection status
             StartCoroutine(CheckConnectionStatus(OnConnectionStatusChecked));
 
-            CreateChatCanvas();
+            // Check if the chatCanvas already exists, if not, create it
+            if (chatCanvas == null) {
+                foreach (var chat in Resources.FindObjectsOfTypeAll<Canvas>()) {
+                    if (chat.name == "ChatCanvas (RCGLifeCycle)") {
+                        chatCanvas = chat.gameObject;
+                        ToastManager.Toast(chat.name); // Log the found canvas
+                    }
+                }
+                // Create Chat Canvas if it doesn't exist
+                if (chatCanvas == null) {
+                    CreateChatCanvas();
+                }
+            }
 
-            // Create Chat Log (Scroll View)
-            CreateChatLog();
+            // Check if the scrollView already exists, if not, create it
+            if (scrollView == null) {
+                foreach (var log in Resources.FindObjectsOfTypeAll<ScrollRect>()) {
+                    if (log.transform.parent.name == "ChatCanvas (RCGLifeCycle)") {
+                        scrollView = log.gameObject;
+                        ToastManager.Toast(log.name); // Log the found ScrollView
+                    }
+                }
+                // Create Chat Log (Scroll View) if it doesn't exist
+                if (scrollView == null) {
+                    CreateChatLog();
+                }
+            }
 
-            // Create Input Field
-            CreateInputField();
+            // Check if the inputField already exists, if not, create it
+            if (inputField == null) {
+                foreach (var input in Resources.FindObjectsOfTypeAll<InputField>()) {
+                    if (input.transform.parent.name == "ChatCanvas (RCGLifeCycle)") {
+                        inputField = input.gameObject;
+                        ToastManager.Toast(input.name); // Log the found InputField
+                    }
+                }
+                // Create Input Field if it doesn't exist
+                if (inputField == null) {
+                    CreateInputField();
+                }
+            }
+
         }
 
         private void OnConnectionStatusChecked(bool success) {
@@ -785,7 +821,7 @@ namespace Multiplayer {
             _playerObjects.Clear();
         }
 
-        
+
 
         private void Update() {
             if (_client.IsRunning && _client.FirstPeer?.ConnectionState == ConnectionState.Connected) {
@@ -797,76 +833,98 @@ namespace Multiplayer {
             }
 
             _client.PollEvents();
-            var input = inputField.GetComponent<InputField>(); // Fetch InputField once
 
-            // Handling the Enter key press
-            if (Input.GetKeyDown(KeyCode.Return)) {
-                isTexting = true;
-                Cursor.lockState = CursorLockMode.None;
-                Cursor.visible = true;
-                if (disableScrollCoroutine != null) {
-                    StopCoroutine(disableScrollCoroutine);
-                    disableScrollCoroutine = null;
-                }
+            // Ensure inputField is not null before accessing
+            if (inputField != null) {
+                var input = inputField.GetComponent<InputField>(); // Fetch InputField once
 
-                // Ensure input field is visible when focusing
-                if (!input.isFocused) {
-                    scrollView.SetActive(true);  // Ensure the scroll view is shown
-                    inputField.SetActive(true);  // Ensure the input field is visible
-                    input.ActivateInputField();  // Focus the input field
-                }
+                // Handling the Enter key press
+                if (Input.GetKeyDown(KeyCode.Return)) {
+                    isTexting = true;
+                    Cursor.lockState = CursorLockMode.None;
+                    Cursor.visible = true;
 
-                // Start counting time when Enter is pressed
-                if (!isTimerRunning) {
-                    timeStarted = Time.time;  // Record the time when Enter was pressed
-                    isTimerRunning = true;    // Start the timer
-                }
-
-                // Now, directly check for Enter key and process message sending
-                string message = input.text.Trim(); // Remove leading/trailing spaces
-
-                if (!string.IsNullOrWhiteSpace(message)) {
-                    // If the message is valid, send it to the chat
-                    SendMessageToChat(message); // Call SendMessageToChat with the message
-                    input.text = string.Empty; // Clear the input field after sending
-                    inputField.SetActive(false); // Hide the input field after sending the message
-                    disableScrollCoroutine = StartCoroutine(DisableScrollViewAfterDelay(3f)); // Optionally hide the scroll view after a delay
-                    isTexting = false;
-                }
-
-                // Make sure to keep the input field focused after processing
-                input.ActivateInputField();
-            }
-
-            // Check for time elapsed after Enter key is pressed
-            if (isTimerRunning) {
-                float timeElapsed = Time.time - timeStarted;  // Calculate elapsed time
-
-                if (timeElapsed >= timeLimit && Input.GetKeyDown(KeyCode.Return)) {
-                    // If the specified time has passed, hide the input field
-                    inputField.SetActive(false);  // Hide the input field after time limit
-                    isTexting = false;
+                    // Stop coroutine if it exists
                     if (disableScrollCoroutine != null) {
                         StopCoroutine(disableScrollCoroutine);
                         disableScrollCoroutine = null;
                     }
-                    disableScrollCoroutine = StartCoroutine(DisableScrollViewAfterDelay(3f)); // Optionally hide the scroll view after a delay
-                    isTimerRunning = false;       // Stop the timer
-                }
-            }
 
-            // Handling the Escape key
-            if (Input.GetKeyDown(KeyCode.Escape)) {
-                input.text = string.Empty; // Clear the input field
-                inputField.SetActive(false); // Hide the input field
-                isTexting = false;
-                if (disableScrollCoroutine != null) {
-                    StopCoroutine(disableScrollCoroutine);
-                    disableScrollCoroutine = null;
+                    // Ensure scrollView and inputField are not null
+                    if (scrollView != null && inputField != null && !input.isFocused) {
+                        scrollView.SetActive(true);  // Ensure the scroll view is shown
+                        inputField.SetActive(true);  // Ensure the input field is visible
+                        input.ActivateInputField();  // Focus the input field
+                    }
+
+                    // Start counting time when Enter is pressed
+                    if (!isTimerRunning) {
+                        timeStarted = Time.time;  // Record the time when Enter was pressed
+                        isTimerRunning = true;    // Start the timer
+                    }
+
+                    // Process message sending if input text is valid
+                    string message = input.text.Trim(); // Remove leading/trailing spaces
+
+                    if (!string.IsNullOrWhiteSpace(message)) {
+                        // If the message is valid, send it to the chat
+                        SendMessageToChat(message); // Call SendMessageToChat with the message
+                        input.text = string.Empty;  // Clear the input field after sending
+                        if (inputField != null) {
+                            inputField.SetActive(false); // Hide the input field after sending the message
+                        }
+                        if (disableScrollCoroutine != null) {
+                            StopCoroutine(disableScrollCoroutine);
+                        }
+                        disableScrollCoroutine = StartCoroutine(DisableScrollViewAfterDelay(3f)); // Optionally hide the scroll view after a delay
+                        isTexting = false;
+                    }
+
+                    // Keep the input field focused after processing
+                    if (inputField != null) {
+                        input.ActivateInputField();
+                    }
                 }
-                disableScrollCoroutine = StartCoroutine(DisableScrollViewAfterDelay(3f)); // Optionally start the coroutine for scroll view
+
+                // Check for time elapsed after Enter key is pressed
+                if (isTimerRunning) {
+                    float timeElapsed = Time.time - timeStarted;  // Calculate elapsed time
+
+                    if (timeElapsed >= timeLimit && Input.GetKeyDown(KeyCode.Return)) {
+                        // If the specified time has passed, hide the input field
+                        if (inputField != null) {
+                            inputField.SetActive(false);  // Hide the input field after time limit
+                        }
+                        isTexting = false;
+
+                        // Stop coroutine if it exists
+                        if (disableScrollCoroutine != null) {
+                            StopCoroutine(disableScrollCoroutine);
+                            disableScrollCoroutine = null;
+                        }
+                        disableScrollCoroutine = StartCoroutine(DisableScrollViewAfterDelay(3f)); // Optionally hide the scroll view after a delay
+                        isTimerRunning = false;  // Stop the timer
+                    }
+                }
+
+                // Handling the Escape key
+                if (Input.GetKeyDown(KeyCode.Escape)) {
+                    if (inputField != null) {
+                        input.text = string.Empty; // Clear the input field
+                        inputField.SetActive(false); // Hide the input field
+                    }
+                    isTexting = false;
+
+                    // Stop coroutine if it exists
+                    if (disableScrollCoroutine != null) {
+                        StopCoroutine(disableScrollCoroutine);
+                        disableScrollCoroutine = null;
+                    }
+                    disableScrollCoroutine = StartCoroutine(DisableScrollViewAfterDelay(3f)); // Optionally start the coroutine for scroll view
+                }
             }
         }
+
 
         // Coroutine to disable the scrollView after a delay
         private IEnumerator DisableScrollViewAfterDelay(float delay) {
@@ -1064,7 +1122,7 @@ namespace Multiplayer {
             _dataWriter.Put("Chat");
             _dataWriter.Put($"{playerName.Value}: {message}");
             _client.FirstPeer.Send(_dataWriter, DeliveryMethod.Unreliable);
-            ToastManager.Toast($"Message sent: {message}");
+            //ToastManager.Toast($"Message sent: {message}");
         }
 
 
