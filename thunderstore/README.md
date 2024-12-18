@@ -14,3 +14,9 @@
 - Download zip unzip Server.exe run it
 - use LAN is straightforward or playing over the internet requires some extra work
 - hosted game should be forwarded in your router to point to the device you are hosting on. Alternatively, you could use software to facilitate extending your LAN, such as Hamachi.
+
+# Server Command
+- say text // say hello
+- tp sceneName example     tp VR_Challenge_Hub // tpeleprot All Playee to Memory Of Boss Room
+- pvp 0 pvp 1 // pvp disable pvp enable
+- stop // shutdown server
