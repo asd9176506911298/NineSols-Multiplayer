@@ -981,6 +981,8 @@ namespace Multiplayer {
         private void ReceiveMessageToChat(string message) {
             if (string.IsNullOrWhiteSpace(message)) return;
 
+            scrollView.SetActive(true);
+
             if (disableScrollCoroutine != null) {
                 StopCoroutine(disableScrollCoroutine);
                 disableScrollCoroutine = null;
@@ -1016,8 +1018,8 @@ namespace Multiplayer {
                 scrollRect.verticalNormalizedPosition = 0f;  // Scroll to the bottom
             }
 
-            scrollView.SetActive(true);
-            disableScrollCoroutine = StartCoroutine(DisableScrollViewAfterDelay(2f));
+            
+            disableScrollCoroutine = StartCoroutine(DisableScrollViewAfterDelay(3f));
         }
 
         private void SendMessageToChat(string message) {

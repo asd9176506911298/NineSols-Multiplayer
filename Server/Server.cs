@@ -142,8 +142,12 @@ namespace Server {
             _writer.Put(_isPvPEnabled);
             peer.Send(_writer, DeliveryMethod.ReliableOrdered);
 
+            var playersName = "";
+            foreach (var x in _players.Values) {
+                playersName += ", " + x.name;
+            }
             _writer = new NetDataWriter();
-            _writer.Put($"Server Player Count:{_server.ConnectedPeersCount}");
+            _writer.Put($"Server Player Count:{_server.ConnectedPeersCount}\n {playersName}");
             peer.Send(_writer, DeliveryMethod.ReliableOrdered);
         }
 
