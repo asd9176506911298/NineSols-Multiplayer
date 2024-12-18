@@ -839,43 +839,33 @@ namespace Multiplayer {
         private void SendMessageToChat(string message) {
             if (string.IsNullOrWhiteSpace(message)) return;
 
-            // Create a new message GameObject
             var messageObj = new GameObject("ChatMessage");
             messageObj.transform.SetParent(chatLog.transform, false);  // Keep local position unaffected
 
-            // Add a RectTransform to the message object
             var messageRect = messageObj.AddComponent<RectTransform>();
-            messageRect.sizeDelta = new Vector2(380, 20);  // Set the width and height of each message (adjust as needed)
+            messageRect.sizeDelta = new Vector2(380, 50);  // Set width and height (adjust to your needs)
 
-            // Add Text component to display the message
             var text = messageObj.AddComponent<Text>();
             text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
             text.fontSize = 14;
-            text.color = Color.white;  // Text color
+            text.color = Color.white;  // Input text color
             text.text = message;
 
-            // Optionally, add LayoutElement for message height control
             var layoutElement = messageObj.AddComponent<LayoutElement>();
-            layoutElement.preferredHeight = 20;  // Set preferred height for each message
+            layoutElement.preferredHeight = 50;  // Control the height of each message box
 
-            // Ensure the content layout is refreshed after adding the message
             var verticalLayout = chatLog.GetComponent<VerticalLayoutGroup>();
             if (verticalLayout != null) {
                 verticalLayout.childForceExpandWidth = true;
                 verticalLayout.childForceExpandHeight = false;
             }
 
-            // Update the content height
             var contentRect = chatLog.GetComponent<RectTransform>();
-            contentRect.sizeDelta = new Vector2(contentRect.sizeDelta.x, contentRect.sizeDelta.y + 20);  // Increase height by 20 (height of each message)
+            contentRect.sizeDelta = new Vector2(contentRect.sizeDelta.x, contentRect.sizeDelta.y + 50);  // Increase the height
 
-            // Force layout to update
-            Canvas.ForceUpdateCanvases();  // Forces the layout to update
-            LayoutRebuilder.ForceRebuildLayoutImmediate(chatLog.GetComponent<RectTransform>());  // Rebuild layout immediately
-
-            // If there’s a ScrollRect, make sure to scroll to the bottom after each new message
             var scrollRect = chatLog.GetComponentInParent<ScrollRect>();
             if (scrollRect != null) {
+                Canvas.ForceUpdateCanvases();  // Forces the layout to update
                 scrollRect.verticalNormalizedPosition = 0f;  // Scroll to the bottom
             }
 
@@ -883,57 +873,50 @@ namespace Multiplayer {
         }
 
 
-
-
         private void CreateChatLog() {
-            var scrollView = new GameObject("ChatLog");
-            scrollView.transform.SetParent(chatCanvas.transform, false);  // Keep local position unaffected
+            // Create the ScrollRect container for the chat log
+            var scrollView = new GameObject("ChatLogScrollView");
+            scrollView.transform.SetParent(chatCanvas.transform);
 
-            // Adjust the RectTransform of the ScrollView
-            var rect = scrollView.AddComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(400, 300);  // Set size of the chat background (adjust as necessary)
-            rect.anchorMin = new Vector2(0, 0);  // Anchor to the bottom-left corner
-            rect.anchorMax = new Vector2(0, 0);  // Anchor to the bottom-left corner
-            rect.pivot = new Vector2(0, 0);  // Pivot at the bottom-left corner
-            rect.anchoredPosition = new Vector2(20, 20);  // Adjust this if needed (for padding from bottom-left corner)
-
-            // Add a ScrollRect to make it scrollable
             var scrollRect = scrollView.AddComponent<ScrollRect>();
-            scrollRect.vertical = true;  // Enable vertical scrolling
-            scrollRect.horizontal = false;  // Disable horizontal scrolling
-            scrollRect.viewport = scrollView.GetComponent<RectTransform>();  // Set the viewport for clipping the overflow
+            scrollRect.vertical = true; // Enable vertical scrolling
+            scrollRect.horizontal = false; // Disable horizontal scrolling
 
-            // Add a Mask component to hide overflow content outside the background
+            var rect = scrollView.GetComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(400, 300);  // Adjust size to fit the screen or design
+            rect.anchorMin = new Vector2(0, 0);  // Anchor to the bottom-left of the screen
+            rect.anchorMax = new Vector2(0, 0);
+            rect.anchoredPosition = new Vector2(rect.sizeDelta.x/2, rect.sizeDelta.y/2);  // Position it in the bottom-left corner
+
+            // Add a Mask component to hide content outside of the scroll view bounds
             var mask = scrollView.AddComponent<Mask>();
-            mask.showMaskGraphic = false;  // Optional: disable the default mask graphic
+            var image = scrollView.AddComponent<Image>();
+            image.color = new Color(0, 0, 0, 0.5f); // Semi-transparent background (can be adjusted)
 
-            // Create content container for messages
+            // Create the content area (where chat messages will be placed)
             var content = new GameObject("Content");
-            content.transform.SetParent(scrollView.transform, false);
+            content.transform.SetParent(scrollView.transform);
 
             var contentRect = content.AddComponent<RectTransform>();
-            contentRect.sizeDelta = new Vector2(400, 0);  // Start with 0 height; it will increase as new messages are added
+            contentRect.sizeDelta = new Vector2(400, 0); // Start with height 0 and grow dynamically
+            contentRect.anchoredPosition = Vector2.zero;
 
-            // Add a VerticalLayoutGroup for automatic message layout
+            // Add Vertical Layout Group to the content to stack messages vertically
             var verticalLayout = content.AddComponent<VerticalLayoutGroup>();
             verticalLayout.childForceExpandWidth = true;
-            verticalLayout.childForceExpandHeight = false;  // Don't force the height expansion
-            verticalLayout.spacing = 5;  // Optional: spacing between messages
+            verticalLayout.childForceExpandHeight = false;  // Messages should not force expansion vertically
+            verticalLayout.spacing = 5;  // Adjust spacing between messages
 
-            // Add ContentSizeFitter to automatically adjust the height based on the number of messages
-            var contentSizeFitter = content.AddComponent<ContentSizeFitter>();
-            contentSizeFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;  // Fit content vertically
-
-            // Set the content for the ScrollRect
+            // Set the ScrollRect's content to the "Content" GameObject
             scrollRect.content = contentRect;
 
-            // Add a background image to the scroll view (optional)
-            var image = scrollView.AddComponent<Image>();
-            image.color = new Color(0, 0, 0, 0.5f);  // Semi-transparent black background
+            // Set the `chatLog` to reference the content for message additions
+            chatLog = content;
 
-            // Set the chat log to the content for message updates
-            chatLog = content;  // Store the content GameObject for adding new messages
+            // Ensure scrolling works as expected
+            scrollRect.verticalNormalizedPosition = 0f; // Scroll to the bottom immediately after creating
         }
+
 
 
 
