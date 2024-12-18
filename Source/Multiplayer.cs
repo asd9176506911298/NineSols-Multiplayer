@@ -849,7 +849,7 @@ namespace Multiplayer {
             scrollRect.horizontal = false; // Disable horizontal scrolling
 
             var rect = scrollView.GetComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(400, 300);  // Adjust size to fit the screen or design
+            rect.sizeDelta = new Vector2(400, 130);  // Adjust size to fit the screen or design
             rect.anchorMin = new Vector2(0, 0);  // Anchor to the bottom-left of the screen
             rect.anchorMax = new Vector2(0, 0);
             rect.anchoredPosition = new Vector2(0, 50);  // Position it in the bottom-left corner
@@ -859,7 +859,7 @@ namespace Multiplayer {
             // Add a Mask component to hide content outside of the scroll view bounds
             var mask = scrollView.AddComponent<Mask>();
             var image = scrollView.AddComponent<Image>();
-            image.color = new Color(0, 0, 0, 0.5f); // Semi-transparent background (can be adjusted)
+            image.color = new Color(0, 0, 0, 0.3f); // Semi-transparent background (can be adjusted)
 
             // Create the content area (where chat messages will be placed)
             var content = new GameObject("Content");
