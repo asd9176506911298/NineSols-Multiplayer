@@ -1,6 +1,7 @@
 ﻿using Auto.Utils;
 using ChartUtil;
 using HarmonyLib;
+using InControl;
 using NineSolsAPI;
 using UnityEngine;
 
@@ -12,6 +13,16 @@ namespace Multiplayer {
         public static bool Prefix(Animator __instance, string stateName, int layer, float normalizedTime) {
             if (__instance.name == "SpriteHolder" && Multiplayer.Instance.localAnimationState != stateName) {
                 Multiplayer.Instance.localAnimationState = stateName;
+            }
+
+            return true; // Allow the original method to execute
+        }
+
+        [HarmonyPatch(typeof(InControlManager), "Update")]
+        [HarmonyPrefix]
+        public static bool HookUpdate(InControlManager __instance) {
+            if (Multiplayer.Instance.isTexting) {
+                return false;
             }
 
             return true; // Allow the original method to execute

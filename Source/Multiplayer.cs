@@ -37,6 +37,12 @@ namespace Multiplayer {
         private ConfigEntry<int> playerNameSize;
         public bool isPVP;
 
+        private float timeStarted = 0f;  // Time when Enter key was pressed
+        private float timeLimit = 0.1f;    // Time after which the input field should be hidden
+        private bool isTimerRunning = false; // Flag to track whether the timer is running
+
+        public bool isTexting = false;
+
         bool testbool = false;
 
         GameObject minionPrefab = null;
@@ -779,9 +785,7 @@ namespace Multiplayer {
             _playerObjects.Clear();
         }
 
-        private float timeStarted = 0f;  // Time when Enter key was pressed
-        private float timeLimit = 0.1f;    // Time after which the input field should be hidden
-        private bool isTimerRunning = false; // Flag to track whether the timer is running
+        
 
         private void Update() {
             if (_client.IsRunning && _client.FirstPeer?.ConnectionState == ConnectionState.Connected) {
@@ -797,6 +801,7 @@ namespace Multiplayer {
 
             // Handling the Enter key press
             if (Input.GetKeyDown(KeyCode.Return)) {
+                isTexting = true;
                 if (disableScrollCoroutine != null) {
                     StopCoroutine(disableScrollCoroutine);
                     disableScrollCoroutine = null;
@@ -824,6 +829,7 @@ namespace Multiplayer {
                     input.text = string.Empty; // Clear the input field after sending
                     inputField.SetActive(false); // Hide the input field after sending the message
                     disableScrollCoroutine = StartCoroutine(DisableScrollViewAfterDelay(2f)); // Optionally hide the scroll view after a delay
+                    isTexting = false;
                 }
 
                 // Make sure to keep the input field focused after processing
@@ -849,7 +855,6 @@ namespace Multiplayer {
                 scrollView.SetActive(false); // Optionally hide the scroll view
                 disableScrollCoroutine = StartCoroutine(DisableScrollViewAfterDelay(2f)); // Optionally start the coroutine for scroll view
             }
-
         }
 
         // Coroutine to disable the scrollView after a delay
