@@ -887,7 +887,7 @@ namespace Multiplayer {
             rect.sizeDelta = new Vector2(400, 300);  // Adjust size to fit the screen or design
             rect.anchorMin = new Vector2(0, 0);  // Anchor to the bottom-left of the screen
             rect.anchorMax = new Vector2(0, 0);
-            rect.anchoredPosition = new Vector2(0, 0);  // Position it in the bottom-left corner
+            rect.anchoredPosition = new Vector2(0, 50);  // Position it in the bottom-left corner
             rect.pivot = new Vector2(0, 0); // Set pivot to bottom-left
 
 
