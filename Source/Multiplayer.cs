@@ -849,7 +849,7 @@ namespace Multiplayer {
             text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
             text.fontSize = 14;
             text.color = Color.white;  // Input text color
-            text.text = message;
+            text.text = playerName.Value + ": " + message;
 
             var layoutElement = messageObj.AddComponent<LayoutElement>();
             layoutElement.preferredHeight = 20;  // Control the height of each message box
