@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 namespace Multiplayer {
     [BepInDependency(NineSolsAPICore.PluginGUID)]
@@ -46,6 +47,11 @@ namespace Multiplayer {
 
         private string? currentAnimationState = string.Empty;
         public string? localAnimationState = "";
+
+        private GameObject chatCanvas;
+        private GameObject inputField;
+        private GameObject chatLog;
+
 
         private void Awake() {
             Instance = this;
@@ -88,7 +94,32 @@ namespace Multiplayer {
             }
 
             Log.Info("Multiplayer plugin initialized.");
+
+            chatCanvas = new GameObject("ChatCanvas");
+            var canvas = chatCanvas.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+
+            // Add CanvasScaler and GraphicRaycaster for proper UI functionality
+            chatCanvas.AddComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            chatCanvas.AddComponent<GraphicRaycaster>();
+
+            var rect = chatCanvas.GetComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(400, 300); // Set your desired size
+            rect.anchorMin = new Vector2(0, 0); // Anchor to bottom-left
+            rect.anchorMax = new Vector2(0, 0); // Anchor to bottom-left
+            rect.pivot = new Vector2(0, 0); // Set pivot to bottom-left corner
+            rect.anchoredPosition = new Vector2(0, 0); // Set position to (0, 0) relativ
+
+            // Create Chat Log (Scroll View)
+            CreateChatLog();
+
+            // Create Input Field
+            CreateInputField();
+
+            // Make chat window initially hidden
+            chatCanvas.SetActive(false);
         }
+
         void SetPlayerNameSize() {
             // Cache the player name size value
             float fontSize = playerNameSize.Value;
@@ -722,8 +753,6 @@ namespace Multiplayer {
             ToastManager.Toast("Disconnected from server.");
         }
 
-
-
         private void ClearPlayerObjects() {
             foreach (var playerData in _playerObjects.Values) {
                 Destroy(playerData.PlayerObject);
@@ -745,8 +774,140 @@ namespace Multiplayer {
             if (testbool) {
                 Player.i.ChangeState(PlayerStateType.ParryCounterDefense, true);
             }
+
+            if (Input.GetKeyDown(KeyCode.T)) {
+                chatCanvas.SetActive(!chatCanvas.activeSelf);
+            }
+
+            // Send message when Enter is pressed
+            if (chatCanvas.activeSelf && Input.GetKeyDown(KeyCode.Return)) {
+                SendMessageToChat(inputField.GetComponent<InputField>().text);
+                inputField.GetComponent<InputField>().text = string.Empty; // Clear input field
+            }
 #endif
         }
+
+        private void CreateChatLog() {
+            var scrollView = new GameObject("ChatLog");
+            scrollView.transform.localPosition = Vector3.zero;
+            scrollView.transform.SetParent(chatCanvas.transform);
+
+            var rect = scrollView.AddComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(400, 300); // Set desired size for the chat log
+            rect.anchoredPosition = new Vector2(0, 0); // Bottom-left of the parent (chatCanvas)
+            rect.anchorMin = new Vector2(0, 0); // Anchor to bottom-left of the parent
+            rect.anchorMax = new Vector2(0, 0); // Anchor to bottom-left of the parent
+            rect.pivot = new Vector2(0, 0); // Set pivot to bottom-left
+
+            var image = scrollView.AddComponent<Image>();
+            image.color = new Color(0, 0, 0, 0.5f); // Set a semi-transparent background
+
+            var content = new GameObject("Content");
+            content.transform.SetParent(scrollView.transform, false); // Keep local position unaffected
+
+            var contentRect = content.AddComponent<RectTransform>();
+            contentRect.sizeDelta = new Vector2(400, 300); // Same size as the scrollView
+            contentRect.anchoredPosition = Vector2.zero; // Align content to bottom-left of the scrollView
+            contentRect.anchorMin = new Vector2(0, 0); // Anchor content to bottom-left
+            contentRect.anchorMax = new Vector2(1, 0); // Stretch content horizontally but align to bottom
+            contentRect.pivot = new Vector2(0, 0); // Set pivot to bottom-left for content
+
+            var verticalLayout = content.AddComponent<VerticalLayoutGroup>();
+            verticalLayout.childForceExpandWidth = true;
+            verticalLayout.childForceExpandHeight = false;
+
+            chatLog = content;
+        }
+
+
+
+
+        private void CreateInputField() {
+            inputField = new GameObject("InputField");
+            inputField.transform.SetParent(chatCanvas.transform);
+
+            var rect = inputField.AddComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(400, 30);
+            rect.anchoredPosition = new Vector2(0, -150);
+
+            var image = inputField.AddComponent<Image>();
+            image.color = Color.gray;
+
+            var input = inputField.AddComponent<InputField>();
+
+            // Add a child GameObject for input text
+            var textObj = new GameObject("Text");
+            textObj.transform.SetParent(inputField.transform);
+
+            var textRect = textObj.AddComponent<RectTransform>();
+            textRect.sizeDelta = new Vector2(380, 25);
+            textRect.anchoredPosition = Vector2.zero;
+
+            var text = textObj.AddComponent<Text>();
+            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            text.fontSize = 14;
+            text.color = Color.black; // Input text color
+            text.alignment = TextAnchor.MiddleLeft;
+
+            input.textComponent = text; // Assign the input text component
+
+            // Add a placeholder text
+            var placeholderObj = new GameObject("Placeholder");
+            placeholderObj.transform.SetParent(inputField.transform);
+
+            var placeholderRect = placeholderObj.AddComponent<RectTransform>();
+            placeholderRect.sizeDelta = new Vector2(380, 25);
+            placeholderRect.anchoredPosition = Vector2.zero;
+
+            var placeholder = placeholderObj.AddComponent<Text>();
+            placeholder.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            placeholder.fontSize = 14;
+            placeholder.color = new Color(0.7f, 0.7f, 0.7f, 1); // Gray placeholder color
+            placeholder.text = "Enter message...";
+            placeholder.alignment = TextAnchor.MiddleLeft;
+
+            input.placeholder = placeholder; // Assign the placeholder component
+        }
+
+        private void SendMessageToChat(string message) {
+            if (string.IsNullOrWhiteSpace(message)) return;
+
+            // Create a new message object
+            var messageObj = new GameObject("ChatMessage");
+            messageObj.transform.SetParent(chatLog.transform, false);  // Keep local position unaffected
+
+            // Add a RectTransform to the message object for layout control
+            var messageRect = messageObj.AddComponent<RectTransform>();
+            messageRect.sizeDelta = new Vector2(380, 50);  // Set width and height (adjust to your needs)
+
+            // Add a Text component to display the message
+            var text = messageObj.AddComponent<Text>();
+            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            text.fontSize = 14;
+            text.color = Color.white;
+            text.text = message;
+
+            // Optionally, add LayoutElement to manage the message size
+            var layoutElement = messageObj.AddComponent<LayoutElement>();
+            layoutElement.preferredHeight = 20;  // Control the height of each message box
+
+            // Ensure the vertical layout group forces proper alignment and spacing
+            var verticalLayout = chatLog.GetComponent<VerticalLayoutGroup>();
+            if (verticalLayout != null) {
+                verticalLayout.childForceExpandWidth = true;
+                verticalLayout.childForceExpandHeight = false;
+            }
+
+            //// If you have a ScrollRect, make sure to scroll to the bottom (if needed)
+            //var scrollRect = scrollView.GetComponent<ScrollRect>();
+            //if (scrollRect != null) {
+            //    Canvas.ForceUpdateCanvases();  // Forces the layout to update
+            //    scrollRect.verticalNormalizedPosition = 0;  // Scroll to the bottom
+            //}
+
+            ToastManager.Toast($"Message sent: {message}");
+        }
+
 
         public void SendDecreaseHealth(int playerId, float value) {
             if (_client.FirstPeer == null) {
