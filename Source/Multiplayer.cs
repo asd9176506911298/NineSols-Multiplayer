@@ -53,6 +53,9 @@ namespace Multiplayer {
         private GameObject chatLog;
         private GameObject scrollView;
 
+        private Coroutine disableScrollCoroutine;
+
+
 
         private void Awake() {
             Instance = this;
@@ -118,7 +121,7 @@ namespace Multiplayer {
             CreateInputField();
 
             // Make chat window initially hidden
-            chatCanvas.SetActive(false);
+            //chatCanvas.SetActive(false);
         }
 
         void SetPlayerNameSize() {
@@ -762,34 +765,26 @@ namespace Multiplayer {
         }
 
         private void Update() {
-            if (_client.IsRunning && _client.FirstPeer?.ConnectionState == ConnectionState.Connected) {
-                _sendTimer += Time.deltaTime;
-                if (_sendTimer >= SendInterval) {
-                    SendPosition();
-                    _sendTimer = 0;
-                }
-            }
-
-            _client.PollEvents();
-
-#if DEBUG
-            if (testbool) {
-                Player.i.ChangeState(PlayerStateType.ParryCounterDefense, true);
-            }
-
             // Toggle chatCanvas with T
             if (Input.GetKeyDown(KeyCode.T)) {
                 var input = inputField.GetComponent<InputField>();
+
+                // Stop any running coroutine when toggling chat
+                if (disableScrollCoroutine != null) {
+                    StopCoroutine(disableScrollCoroutine);
+                    disableScrollCoroutine = null;
+                }
+
                 if (!input.isFocused) {
-                    chatCanvas.SetActive(!chatCanvas.activeSelf);
-                    if (chatCanvas.activeSelf) {
-                        input.ActivateInputField(); // Focus the input field
-                    }
+                    scrollView.SetActive(true);
+                    inputField.SetActive(true);
+
+                    input.ActivateInputField(); // Focus the input field
                 }
             }
 
             // Send message when Enter is pressed
-            if (chatCanvas.activeSelf && Input.GetKeyDown(KeyCode.Return)) {
+            if (scrollView.activeSelf && inputField.activeSelf && Input.GetKeyDown(KeyCode.Return)) {
                 var input = inputField.GetComponent<InputField>();
                 string message = input.text;
 
@@ -798,10 +793,22 @@ namespace Multiplayer {
                     input.text = string.Empty; // Clear input field
                     input.ActivateInputField(); // Refocus input field
                 } else {
-                    chatCanvas.SetActive(!chatCanvas.activeSelf);
+                    inputField.SetActive(false);
+
+                    // Start or restart the coroutine to disable the scrollView after a delay
+                    if (disableScrollCoroutine != null) {
+                        StopCoroutine(disableScrollCoroutine);
+                    }
+                    disableScrollCoroutine = StartCoroutine(DisableScrollViewAfterDelay(2f));
                 }
             }
-#endif
+        }
+
+        // Coroutine to disable the scrollView after a delay
+        private IEnumerator DisableScrollViewAfterDelay(float delay) {
+            yield return new WaitForSeconds(delay);
+            scrollView.SetActive(false);
+            disableScrollCoroutine = null; // Reset the coroutine reference
         }
 
 
@@ -853,6 +860,8 @@ namespace Multiplayer {
             placeholder.alignment = TextAnchor.MiddleLeft;
 
             input.placeholder = placeholder; // Assign the placeholder component
+
+            inputField.SetActive(false);
         }
 
 
@@ -901,6 +910,8 @@ namespace Multiplayer {
 
             // Ensure scrolling works as expected
             scrollRect.verticalNormalizedPosition = 0f; // Scroll to the bottom immediately after creating
+
+            scrollView.SetActive(false);
         }
         private void SendMessageToChat(string message) {
             if (string.IsNullOrWhiteSpace(message)) return;
