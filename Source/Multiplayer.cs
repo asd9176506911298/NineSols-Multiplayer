@@ -1,19 +1,14 @@
-﻿using Auto.Utils;
+﻿
 using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
 using LiteNetLib;
 using LiteNetLib.Utils;
-using Mono.Cecil;
 using NineSolsAPI;
-using NineSolsAPI.Menu;
-using NineSolsAPI.Preload;
-using NineSolsAPI.Utils;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
@@ -39,6 +34,8 @@ namespace Multiplayer {
         private ConfigEntry<bool> displayPlayerName;
         private ConfigEntry<int> playerNameSize;
         public bool isPVP;
+
+        bool testbool = false;
 
         GameObject minionPrefab = null;
 
@@ -76,6 +73,7 @@ namespace Multiplayer {
                 KeybindManager.Add(this, StartMemoryChallenge, () => new KeyboardShortcut(KeyCode.Z));
                 KeybindManager.Add(this, test, () => new KeyboardShortcut(KeyCode.H, KeyCode.LeftControl));
                 KeybindManager.Add(this, test2, () => new KeyboardShortcut(KeyCode.X, KeyCode.LeftControl));
+                KeybindManager.Add(this, test3, () => new KeyboardShortcut(KeyCode.P, KeyCode.LeftControl));
                 ip.Value = "127.0.0.1";
 #endif
 
@@ -131,34 +129,8 @@ namespace Multiplayer {
         }
 
 #if DEBUG
-        public static T CopyComponent<T>(T source, GameObject target) where T : Component {
-            if (source == null || target == null)
-                return null;
-
-            // Add the same type of component to the target
-            T targetComponent = target.AddComponent<T>();
-
-            // Copy all fields from the source to the target
-            System.Type type = typeof(T);
-            var fields = type.GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-
-            foreach (var field in fields) {
-                field.SetValue(targetComponent, field.GetValue(source));
-            }
-
-            // Copy all properties that are not read-only
-            var properties = type.GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            foreach (var property in properties) {
-                if (property.CanWrite && property.GetSetMethod(true) != null) {
-                    try {
-                        property.SetValue(targetComponent, property.GetValue(source));
-                    } catch {
-                        // Handle exceptions if needed (e.g., some properties are not accessible or valid)
-                    }
-                }
-            }
-
-            return targetComponent;
+        void test3() {
+            testbool = !testbool;
         }
 
         private IEnumerator PreloadSceneObjects(string sceneName, string objectPath) {
@@ -769,6 +741,11 @@ namespace Multiplayer {
             }
             //ToastManager.Toast($"{GameCore.Instance.currentCoreState} {Player.i.playerInput.currentStateType}");
             _client.PollEvents();
+#if DEBUG
+            if (testbool) {
+                Player.i.ChangeState(PlayerStateType.ParryCounterDefense, true);
+            }
+#endif
         }
 
         public void SendDecreaseHealth(int playerId, float value) {
