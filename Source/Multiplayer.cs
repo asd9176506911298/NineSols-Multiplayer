@@ -787,51 +787,36 @@ namespace Multiplayer {
 #endif
         }
         private void CreateChatLog() {
-            // Create the ScrollRect container for the chat log
-            var scrollView = new GameObject("ChatLogScrollView");
-            scrollView.transform.SetParent(chatCanvas.transform);
+            var scrollView = new GameObject("ChatLog");
+            scrollView.transform.SetParent(chatCanvas.transform, false);
 
-            var scrollRect = scrollView.AddComponent<ScrollRect>();
-            scrollRect.vertical = true; // Enable vertical scrolling
-            scrollRect.horizontal = false; // Disable horizontal scrolling
+            var rect = scrollView.AddComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(400, 300);  // Adjust width and height as needed
 
-            var rect = scrollView.GetComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(400, 300);  // Adjust size to fit the screen or design
+            // Anchor the scroll view to the bottom-left
+            rect.anchorMin = new Vector2(0, 0);  // Bottom-left corner
+            rect.anchorMax = new Vector2(0, 0);  // Bottom-left corner
+            rect.pivot = new Vector2(0, 0);  // Pivot at the bottom-left corner
 
-            // Add a Mask component to hide content outside of the scroll view bounds
-            var mask = scrollView.AddComponent<Mask>();
+            rect.anchoredPosition = new Vector2(20, 20);  // Position relative to the bottom-left corner (adjust as needed)
+
+            // Add image background for the scroll view
             var image = scrollView.AddComponent<Image>();
-            image.color = new Color(0, 0, 0, 0.5f); // Semi-transparent background (optional)
+            image.color = new Color(0, 0, 0, 0.5f);
 
-            // Create the content area (where chat messages will be placed)
             var content = new GameObject("Content");
-            content.transform.SetParent(scrollView.transform);
+            content.transform.SetParent(scrollView.transform, false);
 
             var contentRect = content.AddComponent<RectTransform>();
-            contentRect.sizeDelta = new Vector2(400, 0); // Start with height 0 and grow dynamically
-            contentRect.anchoredPosition = new Vector2(0, 0); // Start from the bottom of the ScrollRect
+            contentRect.sizeDelta = new Vector2(400, 300);  // Adjust content size
 
-            // Add Vertical Layout Group to the content to stack messages vertically
             var verticalLayout = content.AddComponent<VerticalLayoutGroup>();
             verticalLayout.childForceExpandWidth = true;
-            verticalLayout.childForceExpandHeight = false;  // Messages should not force expansion vertically
-            verticalLayout.spacing = 5;  // Adjust spacing between messages
-            verticalLayout.padding = new RectOffset(0, 0, 5, 5);  // Add padding to the top and bottom (optional)
+            verticalLayout.childForceExpandHeight = false;
 
-            // Reverse the order of the layout by changing pivot and anchor settings
-            contentRect.pivot = new Vector2(0.5f, 0f); // Pivot at the bottom
-            contentRect.anchorMin = new Vector2(0.5f, 0f); // Anchor at the bottom
-            contentRect.anchorMax = new Vector2(0.5f, 0f); // Anchor at the bottom
-
-            // Set the ScrollRect's content to the "Content" GameObject
-            scrollRect.content = contentRect;
-
-            // Set the `chatLog` to reference the content for message additions
             chatLog = content;
-
-            // Ensure scrolling works as expected, starting from the bottom
-            scrollRect.verticalNormalizedPosition = 0f; // Scroll to the bottom immediately after creating
         }
+
 
 
 
@@ -927,15 +912,21 @@ namespace Multiplayer {
             var contentRect = chatLog.GetComponent<RectTransform>();
             contentRect.sizeDelta = new Vector2(contentRect.sizeDelta.x, contentRect.sizeDelta.y + 20);  // Increase the height by 20
 
-            // If you have a ScrollRect, make sure to scroll to the bottom (if needed)
+            // Force layout to update immediately
+            Canvas.ForceUpdateCanvases();  // Forces the layout to update
+
+            // Force the layout rebuild for chat log
+            LayoutRebuilder.ForceRebuildLayoutImmediate(chatLog.GetComponent<RectTransform>());
+
+            // If you have a ScrollRect, make sure to scroll to the bottom immediately
             var scrollRect = chatLog.GetComponentInParent<ScrollRect>();
             if (scrollRect != null) {
-                Canvas.ForceUpdateCanvases();  // Forces the layout to update
-                scrollRect.verticalNormalizedPosition = 0f;  // Scroll to the bottom
+                scrollRect.verticalNormalizedPosition = 0f;  // Scroll to the bottom immediately
             }
 
             ToastManager.Toast($"Message sent: {message}");
         }
+
 
 
 
