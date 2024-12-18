@@ -1241,7 +1241,7 @@ namespace Multiplayer {
                     DisconnectFromServer();
                     break;
                 case "Chat":
-                    ToastManager.Toast("Chat");
+                    //ToastManager.Toast("Chat");
                     var msg = reader.GetString();
 
                     ReceiveMessageToChat(msg);
