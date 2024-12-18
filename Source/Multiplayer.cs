@@ -836,41 +836,6 @@ namespace Multiplayer {
 
             input.placeholder = placeholder; // Assign the placeholder component
         }
-        private void SendMessageToChat(string message) {
-            if (string.IsNullOrWhiteSpace(message)) return;
-
-            var messageObj = new GameObject("ChatMessage");
-            messageObj.transform.SetParent(chatLog.transform, false);  // Keep local position unaffected
-
-            var messageRect = messageObj.AddComponent<RectTransform>();
-            messageRect.sizeDelta = new Vector2(380, 50);  // Set width and height (adjust to your needs)
-
-            var text = messageObj.AddComponent<Text>();
-            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            text.fontSize = 14;
-            text.color = Color.white;  // Input text color
-            text.text = playerName.Value + ": " + message;
-
-            var layoutElement = messageObj.AddComponent<LayoutElement>();
-            layoutElement.preferredHeight = 20;  // Control the height of each message box
-
-            var verticalLayout = chatLog.GetComponent<VerticalLayoutGroup>();
-            if (verticalLayout != null) {
-                verticalLayout.childForceExpandWidth = true;
-                verticalLayout.childForceExpandHeight = false;
-            }
-
-            var contentRect = chatLog.GetComponent<RectTransform>();
-            contentRect.sizeDelta = new Vector2(contentRect.sizeDelta.x, contentRect.sizeDelta.y + 20);  // Increase the height
-
-            var scrollRect = chatLog.GetComponentInParent<ScrollRect>();
-            if (scrollRect != null) {
-                Canvas.ForceUpdateCanvases();  // Forces the layout to update
-                scrollRect.verticalNormalizedPosition = 0f;  // Scroll to the bottom
-            }
-
-            ToastManager.Toast($"Message sent: {message}");
-        }
 
 
         private void CreateChatLog() {
@@ -918,6 +883,41 @@ namespace Multiplayer {
 
             // Ensure scrolling works as expected
             scrollRect.verticalNormalizedPosition = 0f; // Scroll to the bottom immediately after creating
+        }
+        private void SendMessageToChat(string message) {
+            if (string.IsNullOrWhiteSpace(message)) return;
+
+            var messageObj = new GameObject("ChatMessage");
+            messageObj.transform.SetParent(chatLog.transform, false);  // Keep local position unaffected
+
+            var messageRect = messageObj.AddComponent<RectTransform>();
+            messageRect.sizeDelta = new Vector2(380, 50);  // Set width and height (adjust to your needs)
+
+            var text = messageObj.AddComponent<Text>();
+            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            text.fontSize = 14;
+            text.color = Color.white;  // Input text color
+            text.text = playerName.Value + ": " + message;
+
+            var layoutElement = messageObj.AddComponent<LayoutElement>();
+            layoutElement.preferredHeight = 20;  // Control the height of each message box
+
+            var verticalLayout = chatLog.GetComponent<VerticalLayoutGroup>();
+            if (verticalLayout != null) {
+                verticalLayout.childForceExpandWidth = true;
+                verticalLayout.childForceExpandHeight = false;
+            }
+
+            var contentRect = chatLog.GetComponent<RectTransform>();
+            contentRect.sizeDelta = new Vector2(contentRect.sizeDelta.x, contentRect.sizeDelta.y + 20);  // Increase the height
+
+            var scrollRect = chatLog.GetComponentInParent<ScrollRect>();
+            if (scrollRect != null) {
+                Canvas.ForceUpdateCanvases();  // Forces the layout to update
+                scrollRect.verticalNormalizedPosition = 0f;  // Scroll to the bottom
+            }
+
+            ToastManager.Toast($"Message sent: {message}");
         }
 
 
