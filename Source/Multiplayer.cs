@@ -820,18 +820,19 @@ namespace Multiplayer {
         }
 
 
-
-
         private void CreateInputField() {
             inputField = new GameObject("InputField");
             inputField.transform.SetParent(chatCanvas.transform);
 
             var rect = inputField.AddComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(400, 30);
-            rect.anchoredPosition = new Vector2(0, -150);
+            rect.sizeDelta = new Vector2(400, 30);  // Width and height of the input field
+            rect.anchorMin = new Vector2(0, 0);  // Anchor to the bottom-left of the parent (chatCanvas)
+            rect.anchorMax = new Vector2(0, 0);  // Anchor to the bottom-left of the parent
+            rect.pivot = new Vector2(0, 0);  // Set pivot to bottom-left
+            rect.anchoredPosition = new Vector2(10, 10);  // Adjust the offset from the bottom-left corner (adjust as needed)
 
             var image = inputField.AddComponent<Image>();
-            image.color = Color.gray;
+            image.color = Color.gray;  // Background color of the input field
 
             var input = inputField.AddComponent<InputField>();
 
@@ -840,33 +841,33 @@ namespace Multiplayer {
             textObj.transform.SetParent(inputField.transform);
 
             var textRect = textObj.AddComponent<RectTransform>();
-            textRect.sizeDelta = new Vector2(380, 25);
+            textRect.sizeDelta = new Vector2(380, 25);  // Slightly smaller than the input field to leave space for padding
             textRect.anchoredPosition = Vector2.zero;
 
             var text = textObj.AddComponent<Text>();
             text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
             text.fontSize = 14;
-            text.color = Color.black; // Input text color
+            text.color = Color.black;  // Input text color
             text.alignment = TextAnchor.MiddleLeft;
 
-            input.textComponent = text; // Assign the input text component
+            input.textComponent = text;  // Assign the input text component
 
             // Add a placeholder text
             var placeholderObj = new GameObject("Placeholder");
             placeholderObj.transform.SetParent(inputField.transform);
 
             var placeholderRect = placeholderObj.AddComponent<RectTransform>();
-            placeholderRect.sizeDelta = new Vector2(380, 25);
+            placeholderRect.sizeDelta = new Vector2(380, 25);  // Same size as the text component
             placeholderRect.anchoredPosition = Vector2.zero;
 
             var placeholder = placeholderObj.AddComponent<Text>();
             placeholder.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
             placeholder.fontSize = 14;
-            placeholder.color = new Color(0.7f, 0.7f, 0.7f, 1); // Gray placeholder color
-            placeholder.text = "Enter message...";
+            placeholder.color = new Color(0.7f, 0.7f, 0.7f, 1);  // Gray placeholder color
+            placeholder.text = "Enter message...";  // Placeholder text
             placeholder.alignment = TextAnchor.MiddleLeft;
 
-            input.placeholder = placeholder; // Assign the placeholder component
+            input.placeholder = placeholder;  // Assign the placeholder component
         }
 
         private void SendMessageToChat(string message) {
