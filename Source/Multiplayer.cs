@@ -852,7 +852,7 @@ namespace Multiplayer {
             text.text = message;
 
             var layoutElement = messageObj.AddComponent<LayoutElement>();
-            layoutElement.preferredHeight = 50;  // Control the height of each message box
+            layoutElement.preferredHeight = 20;  // Control the height of each message box
 
             var verticalLayout = chatLog.GetComponent<VerticalLayoutGroup>();
             if (verticalLayout != null) {
@@ -861,7 +861,7 @@ namespace Multiplayer {
             }
 
             var contentRect = chatLog.GetComponent<RectTransform>();
-            contentRect.sizeDelta = new Vector2(contentRect.sizeDelta.x, contentRect.sizeDelta.y + 50);  // Increase the height
+            contentRect.sizeDelta = new Vector2(contentRect.sizeDelta.x, contentRect.sizeDelta.y + 20);  // Increase the height
 
             var scrollRect = chatLog.GetComponentInParent<ScrollRect>();
             if (scrollRect != null) {
@@ -908,7 +908,7 @@ namespace Multiplayer {
             var verticalLayout = content.AddComponent<VerticalLayoutGroup>();
             verticalLayout.childForceExpandWidth = true;
             verticalLayout.childForceExpandHeight = false;  // Messages should not force expansion vertically
-            verticalLayout.spacing = 5;  // Adjust spacing between messages
+            verticalLayout.spacing = 2;  // Adjust spacing between messages
 
             // Set the ScrollRect's content to the "Content" GameObject
             scrollRect.content = contentRect;
