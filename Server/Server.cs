@@ -204,11 +204,28 @@ namespace Server {
                     _writer.Put(_players[playerId].name);
                     peer.Send(_writer, DeliveryMethod.Unreliable);
                     break;
+                case "Chat":
+                    var msg = reader.GetString();
+                    Console.WriteLine(msg);
+                    SendChat(msg, peer);
+                    break;
                 default:
                     Console.WriteLine($"Unknown message type: {messageType}");
                     break;
             }
             reader.Recycle();
+        }
+
+        private static void SendChat(string msg, NetPeer excludePeer) {
+            _writer = new NetDataWriter();
+            _writer.Put("Chat");
+            _writer.Put(msg);
+
+            foreach (var peer in _server.ConnectedPeerList) {
+                if (peer != excludePeer) {
+                    peer.Send(_writer, DeliveryMethod.ReliableOrdered);
+                }
+            }
         }
 
         private static void HandleDecreaseHealth(NetPeer peer, NetPacketReader reader) {

@@ -14,6 +14,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using static UnityEngine.UIElements.StylePropertyAnimationSystem;
 
 namespace Multiplayer {
     [BepInDependency(NineSolsAPICore.PluginGUID)]
@@ -99,6 +100,19 @@ namespace Multiplayer {
 
             Log.Info("Multiplayer plugin initialized.");
 
+            CreateChatCanvas();
+
+            // Create Chat Log (Scroll View)
+            CreateChatLog();
+
+            // Create Input Field
+            CreateInputField();
+
+            // Make chat window initially hidden
+            //chatCanvas.SetActive(false);
+        }
+
+        void CreateChatCanvas() {
             chatCanvas = new GameObject("ChatCanvas");
             var canvas = chatCanvas.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -114,14 +128,7 @@ namespace Multiplayer {
             rect.pivot = new Vector2(0, 0); // Set pivot to bottom-left corner
             rect.anchoredPosition = new Vector2(0, 0); // Set position to (0, 0) relativ
 
-            // Create Chat Log (Scroll View)
-            CreateChatLog();
-
-            // Create Input Field
-            CreateInputField();
-
-            // Make chat window initially hidden
-            //chatCanvas.SetActive(false);
+            RCGLifeCycle.DontDestroyForever(chatCanvas);
         }
 
         void SetPlayerNameSize() {
@@ -570,6 +577,14 @@ namespace Multiplayer {
 
             // Start a coroutine to check the connection status
             StartCoroutine(CheckConnectionStatus(OnConnectionStatusChecked));
+
+            CreateChatCanvas();
+
+            // Create Chat Log (Scroll View)
+            CreateChatLog();
+
+            // Create Input Field
+            CreateInputField();
         }
 
         private void OnConnectionStatusChecked(bool success) {
@@ -765,6 +780,15 @@ namespace Multiplayer {
         }
 
         private void Update() {
+            if (_client.IsRunning && _client.FirstPeer?.ConnectionState == ConnectionState.Connected) {
+                _sendTimer += Time.deltaTime;
+                if (_sendTimer >= SendInterval) {
+                    SendPosition();
+                    _sendTimer = 0;
+                }
+            }
+
+            _client.PollEvents();
             // Toggle chatCanvas with T
             if (Input.GetKeyDown(KeyCode.T)) {
                 var input = inputField.GetComponent<InputField>();
@@ -913,6 +937,44 @@ namespace Multiplayer {
 
             scrollView.SetActive(false);
         }
+
+        private void ReceiveMessageToChat(string message) {
+            if (string.IsNullOrWhiteSpace(message)) return;
+
+            var messageObj = new GameObject("ChatMessage");
+            messageObj.transform.SetParent(chatLog.transform, false);  // Keep local position unaffected
+
+            var messageRect = messageObj.AddComponent<RectTransform>();
+            messageRect.sizeDelta = new Vector2(380, 50);  // Set width and height (adjust to your needs)
+
+            var text = messageObj.AddComponent<Text>();
+            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            text.fontSize = 14;
+            text.color = Color.white;  // Input text color
+            text.text = message;
+
+            var layoutElement = messageObj.AddComponent<LayoutElement>();
+            layoutElement.preferredHeight = 20;  // Control the height of each message box
+
+            var verticalLayout = chatLog.GetComponent<VerticalLayoutGroup>();
+            if (verticalLayout != null) {
+                verticalLayout.childForceExpandWidth = true;
+                verticalLayout.childForceExpandHeight = false;
+            }
+
+            var contentRect = chatLog.GetComponent<RectTransform>();
+            contentRect.sizeDelta = new Vector2(contentRect.sizeDelta.x, contentRect.sizeDelta.y + 20);  // Increase the height
+
+            var scrollRect = chatLog.GetComponentInParent<ScrollRect>();
+            if (scrollRect != null) {
+                Canvas.ForceUpdateCanvases();  // Forces the layout to update
+                scrollRect.verticalNormalizedPosition = 0f;  // Scroll to the bottom
+            }
+
+            scrollView.SetActive(true);
+            StartCoroutine(DisableScrollViewAfterDelay(2f));
+        }
+
         private void SendMessageToChat(string message) {
             if (string.IsNullOrWhiteSpace(message)) return;
 
@@ -946,6 +1008,15 @@ namespace Multiplayer {
                 scrollRect.verticalNormalizedPosition = 0f;  // Scroll to the bottom
             }
 
+            if (_client.FirstPeer == null) {
+                ToastManager.Toast("Not connected to server.");
+                return;
+            }
+
+            _dataWriter.Reset();
+            _dataWriter.Put("Chat");
+            _dataWriter.Put($"{playerName.Value}: {message}");
+            _client.FirstPeer.Send(_dataWriter, DeliveryMethod.Unreliable);
             ToastManager.Toast($"Message sent: {message}");
         }
 
@@ -1063,6 +1134,12 @@ namespace Multiplayer {
                 case "stop":
                     ToastManager.Toast("Server Owner Stop Server");
                     DisconnectFromServer();
+                    break;
+                case "Chat":
+                    ToastManager.Toast("Chat");
+                    var msg = reader.GetString();
+
+                    ReceiveMessageToChat(msg);
                     break;
                 default:
                     ToastManager.Toast(messageType);
