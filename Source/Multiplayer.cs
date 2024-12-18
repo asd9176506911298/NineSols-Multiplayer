@@ -902,7 +902,7 @@ namespace Multiplayer {
 
             var contentRect = content.AddComponent<RectTransform>();
             contentRect.sizeDelta = new Vector2(400, 0); // Start with height 0 and grow dynamically
-            contentRect.anchoredPosition = Vector2.zero;
+            contentRect.anchoredPosition = new Vector2(30, 0);
 
             // Add Vertical Layout Group to the content to stack messages vertically
             var verticalLayout = content.AddComponent<VerticalLayoutGroup>();
