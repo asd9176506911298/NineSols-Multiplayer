@@ -779,6 +779,10 @@ namespace Multiplayer {
             _playerObjects.Clear();
         }
 
+        private float timeStarted = 0f;  // Time when Enter key was pressed
+        private float timeLimit = 0.1f;    // Time after which the input field should be hidden
+        private bool isTimerRunning = false; // Flag to track whether the timer is running
+
         private void Update() {
             if (_client.IsRunning && _client.FirstPeer?.ConnectionState == ConnectionState.Connected) {
                 _sendTimer += Time.deltaTime;
@@ -791,6 +795,7 @@ namespace Multiplayer {
             _client.PollEvents();
             var input = inputField.GetComponent<InputField>(); // Fetch InputField once
 
+            // Handling the Enter key press
             if (Input.GetKeyDown(KeyCode.Return)) {
                 if (disableScrollCoroutine != null) {
                     StopCoroutine(disableScrollCoroutine);
@@ -804,6 +809,12 @@ namespace Multiplayer {
                     input.ActivateInputField();  // Focus the input field
                 }
 
+                // Start counting time when Enter is pressed
+                if (!isTimerRunning) {
+                    timeStarted = Time.time;  // Record the time when Enter was pressed
+                    isTimerRunning = true;    // Start the timer
+                }
+
                 // Now, directly check for Enter key and process message sending
                 string message = input.text.Trim(); // Remove leading/trailing spaces
 
@@ -811,13 +822,32 @@ namespace Multiplayer {
                     // If the message is valid, send it to the chat
                     SendMessageToChat(message); // Call SendMessageToChat with the message
                     input.text = string.Empty; // Clear the input field after sending
-                    ToastManager.Toast("111");
-                    inputField.SetActive(false);  // Ensure the input field is visible
-                    disableScrollCoroutine = StartCoroutine(DisableScrollViewAfterDelay(2f));
+                    inputField.SetActive(false); // Hide the input field after sending the message
+                    disableScrollCoroutine = StartCoroutine(DisableScrollViewAfterDelay(2f)); // Optionally hide the scroll view after a delay
                 }
 
                 // Make sure to keep the input field focused after processing
                 input.ActivateInputField();
+            }
+
+            // Check for time elapsed after Enter key is pressed
+            if (isTimerRunning) {
+                float timeElapsed = Time.time - timeStarted;  // Calculate elapsed time
+
+                if (timeElapsed >= timeLimit && Input.GetKeyDown(KeyCode.Return)) {
+                    // If the specified time has passed, hide the input field
+                    inputField.SetActive(false);  // Hide the input field after time limit
+                    scrollView.SetActive(false);  // Optionally hide the scroll view as well
+                    isTimerRunning = false;       // Stop the timer
+                }
+            }
+
+            // Handling the Escape key
+            if (Input.GetKeyDown(KeyCode.Escape)) {
+                input.text = string.Empty; // Clear the input field
+                inputField.SetActive(false); // Hide the input field
+                scrollView.SetActive(false); // Optionally hide the scroll view
+                disableScrollCoroutine = StartCoroutine(DisableScrollViewAfterDelay(2f)); // Optionally start the coroutine for scroll view
             }
 
         }
