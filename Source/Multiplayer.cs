@@ -106,13 +106,13 @@ namespace Multiplayer {
 
             Log.Info("Multiplayer plugin initialized.");
 
-            CreateChatCanvas();
+            //CreateChatCanvas();
 
-            // Create Chat Log (Scroll View)
-            CreateChatLog();
+            //// Create Chat Log (Scroll View)
+            //CreateChatLog();
 
-            // Create Input Field
-            CreateInputField();
+            //// Create Input Field
+            //CreateInputField();
 
             // Make chat window initially hidden
             //chatCanvas.SetActive(false);
@@ -134,7 +134,7 @@ namespace Multiplayer {
             rect.pivot = new Vector2(0, 0); // Set pivot to bottom-left corner
             rect.anchoredPosition = new Vector2(0, 0); // Set position to (0, 0) relativ
 
-            //RCGLifeCycle.DontDestroyForever(chatCanvas);
+            RCGLifeCycle.DontDestroyForever(chatCanvas);
         }
 
         void SetPlayerNameSize() {
@@ -802,6 +802,8 @@ namespace Multiplayer {
             // Handling the Enter key press
             if (Input.GetKeyDown(KeyCode.Return)) {
                 isTexting = true;
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
                 if (disableScrollCoroutine != null) {
                     StopCoroutine(disableScrollCoroutine);
                     disableScrollCoroutine = null;
@@ -828,7 +830,7 @@ namespace Multiplayer {
                     SendMessageToChat(message); // Call SendMessageToChat with the message
                     input.text = string.Empty; // Clear the input field after sending
                     inputField.SetActive(false); // Hide the input field after sending the message
-                    disableScrollCoroutine = StartCoroutine(DisableScrollViewAfterDelay(2f)); // Optionally hide the scroll view after a delay
+                    disableScrollCoroutine = StartCoroutine(DisableScrollViewAfterDelay(3f)); // Optionally hide the scroll view after a delay
                     isTexting = false;
                 }
 
@@ -843,7 +845,12 @@ namespace Multiplayer {
                 if (timeElapsed >= timeLimit && Input.GetKeyDown(KeyCode.Return)) {
                     // If the specified time has passed, hide the input field
                     inputField.SetActive(false);  // Hide the input field after time limit
-                    scrollView.SetActive(false);  // Optionally hide the scroll view as well
+                    isTexting = false;
+                    if (disableScrollCoroutine != null) {
+                        StopCoroutine(disableScrollCoroutine);
+                        disableScrollCoroutine = null;
+                    }
+                    disableScrollCoroutine = StartCoroutine(DisableScrollViewAfterDelay(3f)); // Optionally hide the scroll view after a delay
                     isTimerRunning = false;       // Stop the timer
                 }
             }
@@ -852,8 +859,12 @@ namespace Multiplayer {
             if (Input.GetKeyDown(KeyCode.Escape)) {
                 input.text = string.Empty; // Clear the input field
                 inputField.SetActive(false); // Hide the input field
-                scrollView.SetActive(false); // Optionally hide the scroll view
-                disableScrollCoroutine = StartCoroutine(DisableScrollViewAfterDelay(2f)); // Optionally start the coroutine for scroll view
+                isTexting = false;
+                if (disableScrollCoroutine != null) {
+                    StopCoroutine(disableScrollCoroutine);
+                    disableScrollCoroutine = null;
+                }
+                disableScrollCoroutine = StartCoroutine(DisableScrollViewAfterDelay(3f)); // Optionally start the coroutine for scroll view
             }
         }
 
@@ -970,6 +981,11 @@ namespace Multiplayer {
         private void ReceiveMessageToChat(string message) {
             if (string.IsNullOrWhiteSpace(message)) return;
 
+            if (disableScrollCoroutine != null) {
+                StopCoroutine(disableScrollCoroutine);
+                disableScrollCoroutine = null;
+            }
+
             var messageObj = new GameObject("ChatMessage");
             messageObj.transform.SetParent(chatLog.transform, false);  // Keep local position unaffected
 
@@ -1001,7 +1017,7 @@ namespace Multiplayer {
             }
 
             scrollView.SetActive(true);
-            StartCoroutine(DisableScrollViewAfterDelay(2f));
+            disableScrollCoroutine = StartCoroutine(DisableScrollViewAfterDelay(2f));
         }
 
         private void SendMessageToChat(string message) {

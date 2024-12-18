@@ -2,6 +2,7 @@
 using ChartUtil;
 using HarmonyLib;
 using InControl;
+using InputExtension;
 using NineSolsAPI;
 using UnityEngine;
 
@@ -24,6 +25,15 @@ namespace Multiplayer {
             if (Multiplayer.Instance.isTexting) {
                 return false;
             }
+
+            return true; // Allow the original method to execute
+        }
+
+        [HarmonyPatch(typeof(RCGInput), "SetCursorVisible")]
+        [HarmonyPrefix]
+        public static bool HookSetCursorVisible(ref bool visible) {
+            if (Multiplayer.Instance.isTexting)
+                return false;
 
             return true; // Allow the original method to execute
         }
