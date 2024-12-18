@@ -51,6 +51,7 @@ namespace Multiplayer {
         private GameObject chatCanvas;
         private GameObject inputField;
         private GameObject chatLog;
+        private GameObject scrollView;
 
 
         private void Awake() {
@@ -768,24 +769,41 @@ namespace Multiplayer {
                     _sendTimer = 0;
                 }
             }
-            //ToastManager.Toast($"{GameCore.Instance.currentCoreState} {Player.i.playerInput.currentStateType}");
+
             _client.PollEvents();
+
 #if DEBUG
             if (testbool) {
                 Player.i.ChangeState(PlayerStateType.ParryCounterDefense, true);
             }
 
+            // Toggle chatCanvas with T
             if (Input.GetKeyDown(KeyCode.T)) {
-                chatCanvas.SetActive(!chatCanvas.activeSelf);
+                var input = inputField.GetComponent<InputField>();
+                if (!input.isFocused) {
+                    chatCanvas.SetActive(!chatCanvas.activeSelf);
+                    if (chatCanvas.activeSelf) {
+                        input.ActivateInputField(); // Focus the input field
+                    }
+                }
             }
 
             // Send message when Enter is pressed
             if (chatCanvas.activeSelf && Input.GetKeyDown(KeyCode.Return)) {
-                SendMessageToChat(inputField.GetComponent<InputField>().text);
-                inputField.GetComponent<InputField>().text = string.Empty; // Clear input field
+                var input = inputField.GetComponent<InputField>();
+                string message = input.text;
+
+                if (!string.IsNullOrWhiteSpace(message)) {
+                    SendMessageToChat(message);
+                    input.text = string.Empty; // Clear input field
+                    input.ActivateInputField(); // Refocus input field
+                } else {
+                    chatCanvas.SetActive(!chatCanvas.activeSelf);
+                }
             }
 #endif
         }
+
 
         private void CreateInputField() {
             inputField = new GameObject("InputField");
@@ -840,7 +858,7 @@ namespace Multiplayer {
 
         private void CreateChatLog() {
             // Create the ScrollRect container for the chat log
-            var scrollView = new GameObject("ChatLogScrollView");
+            scrollView = new GameObject("ChatLogScrollView");
             scrollView.transform.localPosition = Vector3.zero;
             scrollView.transform.SetParent(chatCanvas.transform);
 
