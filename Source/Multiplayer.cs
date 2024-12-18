@@ -876,6 +876,7 @@ namespace Multiplayer {
         private void CreateChatLog() {
             // Create the ScrollRect container for the chat log
             var scrollView = new GameObject("ChatLogScrollView");
+            scrollView.transform.localPosition = Vector3.zero;
             scrollView.transform.SetParent(chatCanvas.transform);
 
             var scrollRect = scrollView.AddComponent<ScrollRect>();
@@ -886,7 +887,9 @@ namespace Multiplayer {
             rect.sizeDelta = new Vector2(400, 300);  // Adjust size to fit the screen or design
             rect.anchorMin = new Vector2(0, 0);  // Anchor to the bottom-left of the screen
             rect.anchorMax = new Vector2(0, 0);
-            rect.anchoredPosition = new Vector2(rect.sizeDelta.x/2, rect.sizeDelta.y/2);  // Position it in the bottom-left corner
+            rect.anchoredPosition = new Vector2(0, 0);  // Position it in the bottom-left corner
+            rect.pivot = new Vector2(0, 0); // Set pivot to bottom-left
+
 
             // Add a Mask component to hide content outside of the scroll view bounds
             var mask = scrollView.AddComponent<Mask>();
