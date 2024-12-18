@@ -17,45 +17,45 @@ namespace Multiplayer {
             return true; // Allow the original method to execute
         }
 
-        [HarmonyPatch(typeof(EffectReceiver), "OnHitEnter")]
-        [HarmonyPrefix]
-        public static bool OnHitEnter(EffectReceiver __instance, EffectHitData data) {
-            if (__instance.transform.parent.parent.name.StartsWith("PlayerObject_")) {
-                foreach (var playerData in Multiplayer.Instance._playerObjects.Values) {
-                    if (playerData.PlayerObject == __instance.transform.parent.parent.gameObject && Multiplayer.Instance.isPVP) {
-                        Multiplayer.Instance.SendDecreaseHealth(playerData.id, data.dealer.FinalValue);
-                    }
-                }
-            }
+        //[HarmonyPatch(typeof(EffectReceiver), "OnHitEnter")]
+        //[HarmonyPrefix]
+        //public static bool OnHitEnter(EffectReceiver __instance, EffectHitData data) {
+        //    if (__instance.transform.parent.parent.name.StartsWith("PlayerObject_")) {
+        //        foreach (var playerData in Multiplayer.Instance._playerObjects.Values) {
+        //            if (playerData.PlayerObject == __instance.transform.parent.parent.gameObject && Multiplayer.Instance.isPVP) {
+        //                Multiplayer.Instance.SendDecreaseHealth(playerData.id, data.dealer.FinalValue);
+        //            }
+        //        }
+        //    }
 
-            return true; // Allow the original method to execute
-        }
+        //    return true; // Allow the original method to execute
+        //}
 
-        [HarmonyPatch(typeof(ParriableAttackEffect), "EffectCountered")]
-        [HarmonyPostfix]
-        public static void hookEffectCountered(ParriableAttackEffect __instance, PlayerParryState parryState, EffectHitData hitData) {
-            ToastManager.Toast(hitData.dealer.transform.root.gameObject);
+        //[HarmonyPatch(typeof(ParriableAttackEffect), "EffectCountered")]
+        //[HarmonyPostfix]
+        //public static void hookEffectCountered(ParriableAttackEffect __instance, PlayerParryState parryState, EffectHitData hitData) {
+        //    ToastManager.Toast(hitData.dealer.transform.root.gameObject);
 
-            GameObject rootObject = hitData.dealer.transform.root.gameObject;
+        //    GameObject rootObject = hitData.dealer.transform.root.gameObject;
 
-            // Find the PlayerData whose PlayerObject matches the rootObject
-            PlayerData matchingPlayerData = null;
+        //    // Find the PlayerData whose PlayerObject matches the rootObject
+        //    PlayerData matchingPlayerData = null;
 
-            foreach (var playerDataEntry in Multiplayer.Instance._playerObjects.Values) {
-                if (playerDataEntry.PlayerObject == rootObject) {
-                    matchingPlayerData = playerDataEntry;
-                    break;
-                }
-            }
+        //    foreach (var playerDataEntry in Multiplayer.Instance._playerObjects.Values) {
+        //        if (playerDataEntry.PlayerObject == rootObject) {
+        //            matchingPlayerData = playerDataEntry;
+        //            break;
+        //        }
+        //    }
 
-            if (matchingPlayerData != null) {
-                ToastManager.Toast($"Found PlayerData: ID = {matchingPlayerData.id}, Name = {matchingPlayerData.name}");
-            } else {
-                ToastManager.Toast("PlayerData not found for the given GameObject.");
-            }
-            //ToastManager.Toast($"result:{__result}");
-            Multiplayer.Instance.SendRecoverableDamage(matchingPlayerData.id, hitData.dealer.FinalValue);
-        }
+        //    if (matchingPlayerData != null) {
+        //        ToastManager.Toast($"Found PlayerData: ID = {matchingPlayerData.id}, Name = {matchingPlayerData.name}");
+        //    } else {
+        //        ToastManager.Toast("PlayerData not found for the given GameObject.");
+        //    }
+        //    //ToastManager.Toast($"result:{__result}");
+        //    Multiplayer.Instance.SendRecoverableDamage(matchingPlayerData.id, hitData.dealer.FinalValue);
+        //}
 
         //[HarmonyPatch(typeof(ParryCounterDefenseState), "Parried")]
         //[HarmonyPostfix]
