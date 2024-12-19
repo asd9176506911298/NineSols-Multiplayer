@@ -242,11 +242,18 @@ namespace Multiplayer {
             SceneManager.LoadScene(SceneManager.GetActiveScene().name);
         }
 
-       
+        GameObject enemy = null;
 
         void test2() {
             // Array of player object names
             ToastManager.Toast(":goodtimefrog: Za Warudo");
+
+            GameObject g = GameObject.Find("A1_S2_GameLevel/Room/Prefab/Gameplay5/EventBinder/LootProvider/General Boss Fight FSM ObjectA1_S2_大劍兵/FSM Animator/LogicRoot/---Boss---/BossShowHealthArea/StealthGameMonster_Samurai_General_Boss Variant/MonsterCore/Animator(Proxy)/Animator");
+
+            var p = Player.i.transform.position;
+            var pos = new Vector3(p.x, p.y + 40f, p.z);
+            if (enemy == null)
+                enemy = Instantiate(g, pos, Quaternion.identity);
 
             //var sp = GameObject.Find("GameCore(Clone)/RCG LifeCycle/PPlayer/RotateProxy/SpriteHolder/customObject").GetComponent<SpriteRenderer>().sprite;
             ////ToastManager.Toast(sp);
