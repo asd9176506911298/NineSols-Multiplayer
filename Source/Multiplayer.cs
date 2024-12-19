@@ -1067,7 +1067,7 @@ namespace Multiplayer {
             var layoutElement = messageObj.AddComponent<LayoutElement>();
             layoutElement.preferredWidth = 380;  // Maximum width before wrapping
             layoutElement.flexibleHeight = 0;   // Let the height adjust dynamically
-            layoutElement.minHeight = 20;       // Minimum height for single-line messages
+            layoutElement.minHeight = 5f;       // Minimum height for single-line messages
 
             // Force the layout to update after adding the message
             Canvas.ForceUpdateCanvases();
@@ -1111,7 +1111,7 @@ namespace Multiplayer {
             var layoutElement = messageObj.AddComponent<LayoutElement>();
             layoutElement.preferredWidth = 380;  // Max width of the message before wrapping
             layoutElement.flexibleHeight = 0;   // Let height adjust dynamically
-            layoutElement.minHeight = 20;       // Minimum height for single-line messages
+            layoutElement.minHeight = 5f;       // Minimum height for single-line messages
 
             // Force the layout to update to account for the new message
             Canvas.ForceUpdateCanvases();
