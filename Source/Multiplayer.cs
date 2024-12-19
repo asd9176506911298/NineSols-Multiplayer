@@ -1018,7 +1018,7 @@ namespace Multiplayer {
             verticalLayout.childAlignment = TextAnchor.UpperLeft;
             verticalLayout.childForceExpandWidth = true;
             verticalLayout.childForceExpandHeight = false;  // Let messages grow vertically as needed
-            verticalLayout.spacing = 5; // Space between messages
+            verticalLayout.spacing = 2; // Space between messages
 
             var fitter = content.AddComponent<ContentSizeFitter>();
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
