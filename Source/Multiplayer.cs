@@ -10,6 +10,7 @@ using NineSolsAPI;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using TMPro;
@@ -245,14 +246,58 @@ namespace Multiplayer {
 
         GameObject v = null;
 
+        Camera cameraToUse = null;
+
+        void CaptureScreenshot() {
+            // Find the camera dynamically if not set in inspector
+            if (cameraToUse == null) {
+                cameraToUse = GameObject.Find("CameraCore/DockObj/OffsetObj/ShakeObj/SceneCamera").GetComponent<Camera>();
+            }
+
+            // Set the desired resolution (3840x2160)
+            int width = 15360;
+            int height = 8640;
+
+            // Create a RenderTexture with the desired resolution
+            RenderTexture rt = new RenderTexture(width, height, 24);
+            cameraToUse.targetTexture = rt;
+
+            // Set the background to transparent
+            cameraToUse.clearFlags = CameraClearFlags.SolidColor;
+            cameraToUse.backgroundColor = new Color(0, 0, 0, 0); // Fully transparent
+
+            // Render the object to the RenderTexture
+            RenderTexture.active = rt;
+            cameraToUse.Render();
+
+            // Create a Texture2D to read pixels from the RenderTexture
+            Texture2D screenshot = new Texture2D(width, height, TextureFormat.RGBA32, false);
+            screenshot.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+            screenshot.Apply();
+
+            // Convert the texture to PNG
+            byte[] bytes = screenshot.EncodeToPNG();
+
+            // Save the PNG to file
+            string path = Path.Combine(Application.dataPath, "Screenshot.png");
+            File.WriteAllBytes(path, bytes);
+
+            // Clean up
+            cameraToUse.targetTexture = null;
+            RenderTexture.active = null;
+            Destroy(rt);
+
+            Debug.Log("Screenshot saved to: " + path);
+        }
 
         void test2() {
             // Array of player object names
             ToastManager.Toast(":goodtimefrog: Za Warudo");
+            CaptureScreenshot();
             //ToastManager.Toast(MonsterManager.Instance.FindClosestMonster().GetComponentsInChildren<SpriteRenderer>());
             //ToastManager.Toast(MonsterManager.Instance.FindClosestMonster().transform.Find("MonsterCore/Animator(Proxy)/Animator/StealthMonster_GiantBlade"));
             //v = Instantiate(MonsterManager.Instance.FindClosestMonster().transform.Find("MonsterCore/Animator(Proxy)/Animator/StealthMonster_GiantBlade")).gameObject;
-            
+
             //foreach (var x in MonsterManager.Instance.FindClosestMonster().GetComponentsInChildren<SpriteRenderer>()) {
             //    // Check if the component SpriteFlasher exists
             //    SpriteFlasher flasher;
