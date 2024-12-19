@@ -589,8 +589,9 @@ namespace Multiplayer {
             if (chatCanvas == null) {
                 foreach (var chat in Resources.FindObjectsOfTypeAll<Canvas>()) {
                     if (chat.name == "ChatCanvas (RCGLifeCycle)") {
-                        chatCanvas = chat.gameObject;
-                        ToastManager.Toast(chat.name); // Log the found canvas
+                        Destroy(chat.gameObject);
+                        //chatCanvas = chat.gameObject;
+                        //ToastManager.Toast(chat.name); // Log the found canvas
                     }
                 }
                 // Create Chat Canvas if it doesn't exist
@@ -939,7 +940,7 @@ namespace Multiplayer {
             inputField.transform.SetParent(chatCanvas.transform, false);  // Keep local position unaffected
 
             var rect = inputField.AddComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(Screen.width, 30);  // Adjust width and height of the input field
+            rect.sizeDelta = new Vector2(380, 30);  // Adjust width and height of the input field
             rect.anchorMin = new Vector2(0, 0);  // Anchor it to the bottom-left corner
             rect.anchorMax = new Vector2(0, 0);  // Anchor it to the bottom-left corner
             rect.pivot = new Vector2(0, 0);  // Set pivot at the bottom-left corner
@@ -955,7 +956,7 @@ namespace Multiplayer {
             textObj.transform.SetParent(inputField.transform, false);
 
             var textRect = textObj.AddComponent<RectTransform>();
-            textRect.sizeDelta = new Vector2(Screen.width - 20, 25);  // Adjust size of the text input
+            textRect.sizeDelta = new Vector2(360, 25);  // Adjust size of the text input
             textRect.anchoredPosition = Vector2.zero;
 
             var text = textObj.AddComponent<Text>();
@@ -971,12 +972,12 @@ namespace Multiplayer {
             placeholderObj.transform.SetParent(inputField.transform, false);
 
             var placeholderRect = placeholderObj.AddComponent<RectTransform>();
-            placeholderRect.sizeDelta = new Vector2(Screen.width - 20, 25);
+            placeholderRect.sizeDelta = new Vector2(360, 25);
             placeholderRect.anchoredPosition = Vector2.zero;
 
             var placeholder = placeholderObj.AddComponent<Text>();
             placeholder.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            placeholder.fontSize = 14;
+            placeholder.fontSize = 12;
             placeholder.color = new Color(0.7f, 0.7f, 0.7f, 1); // Gray placeholder color
             placeholder.text = "Enter message...";
             placeholder.alignment = TextAnchor.MiddleLeft;
@@ -988,7 +989,6 @@ namespace Multiplayer {
 
 
         private void CreateChatLog() {
-            // Create the ScrollRect container for the chat log
             scrollView = new GameObject("ChatLogScrollView");
             scrollView.transform.localPosition = Vector3.zero;
             scrollView.transform.SetParent(chatCanvas.transform);
@@ -998,121 +998,133 @@ namespace Multiplayer {
             scrollRect.horizontal = false; // Disable horizontal scrolling
 
             var rect = scrollView.GetComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(Screen.width, 130);  // Adjust size to fit the screen or design
-            rect.anchorMin = new Vector2(0, 0);  // Anchor to the bottom-left of the screen
+            rect.sizeDelta = new Vector2(380, 130); // Adjust size as needed
+            rect.anchorMin = new Vector2(0, 0);
             rect.anchorMax = new Vector2(0, 0);
-            rect.anchoredPosition = new Vector2(0, 50);  // Position it in the bottom-left corner
-            rect.pivot = new Vector2(0, 0); // Set pivot to bottom-left
+            rect.anchoredPosition = new Vector2(20, 50);
+            rect.pivot = new Vector2(0, 0);
 
-
-            // Add a Mask component to hide content outside of the scroll view bounds
             var mask = scrollView.AddComponent<Mask>();
             var image = scrollView.AddComponent<Image>();
-            image.color = new Color(0, 0, 0, 0.3f); // Semi-transparent background (can be adjusted)
+            image.color = new Color(0, 0, 0, 0.3f);
 
-            // Create the content area (where chat messages will be placed)
             var content = new GameObject("Content");
             content.transform.SetParent(scrollView.transform);
 
             var contentRect = content.AddComponent<RectTransform>();
-            contentRect.sizeDelta = new Vector2(Screen.width, 0); // Start with height 0 and grow dynamically
-            contentRect.anchoredPosition = new Vector2(30, 0);
+            contentRect.sizeDelta = new Vector2(370, 0);
+            contentRect.anchoredPosition = new Vector2(10, 0);
 
-            // Add Vertical Layout Group to the content to stack messages vertically
             var verticalLayout = content.AddComponent<VerticalLayoutGroup>();
+            verticalLayout.childAlignment = TextAnchor.UpperLeft;
             verticalLayout.childForceExpandWidth = true;
-            verticalLayout.childForceExpandHeight = false;  // Messages should not force expansion vertically
-            verticalLayout.spacing = 2;  // Adjust spacing between messages
+            verticalLayout.childForceExpandHeight = false;  // Let messages grow vertically as needed
+            verticalLayout.spacing = 5; // Space between messages
 
-            // Set the ScrollRect's content to the "Content" GameObject
+            var fitter = content.AddComponent<ContentSizeFitter>();
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
             scrollRect.content = contentRect;
 
-            // Set the `chatLog` to reference the content for message additions
             chatLog = content;
-
-            // Ensure scrolling works as expected
-            scrollRect.verticalNormalizedPosition = 0f; // Scroll to the bottom immediately after creating
 
             scrollView.SetActive(false);
         }
 
+
         private void ReceiveMessageToChat(string message) {
             if (string.IsNullOrWhiteSpace(message)) return;
 
+            // Ensure the scroll view is active
             scrollView.SetActive(true);
 
+            // Stop any active coroutine to disable the scroll view
             if (disableScrollCoroutine != null) {
                 StopCoroutine(disableScrollCoroutine);
                 disableScrollCoroutine = null;
             }
 
+            // Create a new GameObject for the chat message
             var messageObj = new GameObject("ChatMessage");
-            messageObj.transform.SetParent(chatLog.transform, false);  // Keep local position unaffected
+            messageObj.transform.SetParent(chatLog.transform, false);
 
+            // Add RectTransform for layout
             var messageRect = messageObj.AddComponent<RectTransform>();
-            messageRect.sizeDelta = new Vector2(Screen.width, 50);  // Set width and height (adjust to your needs)
+            messageRect.sizeDelta = new Vector2(0, 0);  // Allow size to adjust dynamically
 
+            // Add Text component for displaying the message
             var text = messageObj.AddComponent<Text>();
             text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            text.fontSize = 14;
-            text.color = Color.white;  // Input text color
+            text.fontSize = 12;
+            text.color = Color.white;  // Set the text color
             text.text = message;
 
+            // Enable word wrapping and multi-line behavior
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+            text.alignment = TextAnchor.UpperLeft;
+
+            // Add LayoutElement to allow dynamic height adjustment
             var layoutElement = messageObj.AddComponent<LayoutElement>();
-            layoutElement.preferredHeight = 20;  // Control the height of each message box
+            layoutElement.preferredWidth = 380;  // Maximum width before wrapping
+            layoutElement.flexibleHeight = 0;   // Let the height adjust dynamically
+            layoutElement.minHeight = 20;       // Minimum height for single-line messages
 
-            var verticalLayout = chatLog.GetComponent<VerticalLayoutGroup>();
-            if (verticalLayout != null) {
-                verticalLayout.childForceExpandWidth = true;
-                verticalLayout.childForceExpandHeight = false;
-            }
+            // Force the layout to update after adding the message
+            Canvas.ForceUpdateCanvases();
 
-            var contentRect = chatLog.GetComponent<RectTransform>();
-            contentRect.sizeDelta = new Vector2(contentRect.sizeDelta.x, contentRect.sizeDelta.y + 20);  // Increase the height
-
+            // Scroll to the bottom of the chat log
             var scrollRect = chatLog.GetComponentInParent<ScrollRect>();
             if (scrollRect != null) {
-                Canvas.ForceUpdateCanvases();  // Forces the layout to update
+                Canvas.ForceUpdateCanvases();  // Ensure layout updates are applied
                 scrollRect.verticalNormalizedPosition = 0f;  // Scroll to the bottom
             }
 
-            
-            disableScrollCoroutine = StartCoroutine(DisableScrollViewAfterDelay(3f));
+            if(!isTexting)
+                disableScrollCoroutine = StartCoroutine(DisableScrollViewAfterDelay(3f));
         }
+
 
         private void SendMessageToChat(string message) {
             if (string.IsNullOrWhiteSpace(message)) return;
 
+            // Create the GameObject for the chat message
             var messageObj = new GameObject("ChatMessage");
-            messageObj.transform.SetParent(chatLog.transform, false);  // Keep local position unaffected
+            messageObj.transform.SetParent(chatLog.transform, false);  // Attach to the chatLog container
 
+            // Add RectTransform
             var messageRect = messageObj.AddComponent<RectTransform>();
-            messageRect.sizeDelta = new Vector2(380, 50);  // Set width and height (adjust to your needs)
+            messageRect.sizeDelta = new Vector2(0, 0);  // Allow dynamic adjustment based on content
 
+            // Add Text component
             var text = messageObj.AddComponent<Text>();
             text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
             text.fontSize = 12;
-            text.color = Color.white;  // Input text color
+            text.color = Color.white;  // Set text color
             text.text = playerName.Value + ": " + message;
 
+            // Enable wrapping and multi-line behavior
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+            text.alignment = TextAnchor.UpperLeft;
+
+            // Add LayoutElement for dynamic layout adjustments
             var layoutElement = messageObj.AddComponent<LayoutElement>();
-            layoutElement.preferredHeight = 20;  // Control the height of each message box
+            layoutElement.preferredWidth = 380;  // Max width of the message before wrapping
+            layoutElement.flexibleHeight = 0;   // Let height adjust dynamically
+            layoutElement.minHeight = 20;       // Minimum height for single-line messages
 
-            var verticalLayout = chatLog.GetComponent<VerticalLayoutGroup>();
-            if (verticalLayout != null) {
-                verticalLayout.childForceExpandWidth = true;
-                verticalLayout.childForceExpandHeight = false;
-            }
+            // Force the layout to update to account for the new message
+            Canvas.ForceUpdateCanvases();
 
-            var contentRect = chatLog.GetComponent<RectTransform>();
-            contentRect.sizeDelta = new Vector2(contentRect.sizeDelta.x, contentRect.sizeDelta.y + 20);  // Increase the height
-
+            // Scroll to the bottom to display the latest message
             var scrollRect = chatLog.GetComponentInParent<ScrollRect>();
             if (scrollRect != null) {
-                Canvas.ForceUpdateCanvases();  // Forces the layout to update
+                Canvas.ForceUpdateCanvases();  // Ensure layout updates are applied
                 scrollRect.verticalNormalizedPosition = 0f;  // Scroll to the bottom
             }
 
+            // Networking logic
             if (_client.FirstPeer == null) {
                 ToastManager.Toast("Not connected to server.");
                 return;
@@ -1122,8 +1134,8 @@ namespace Multiplayer {
             _dataWriter.Put("Chat");
             _dataWriter.Put($"{playerName.Value}: {message}");
             _client.FirstPeer.Send(_dataWriter, DeliveryMethod.Unreliable);
-            //ToastManager.Toast($"Message sent: {message}");
         }
+
 
 
 
