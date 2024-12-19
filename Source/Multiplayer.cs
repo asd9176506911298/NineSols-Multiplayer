@@ -589,8 +589,7 @@ namespace Multiplayer {
             if (chatCanvas == null) {
                 foreach (var chat in Resources.FindObjectsOfTypeAll<Canvas>()) {
                     if (chat.name == "ChatCanvas (RCGLifeCycle)") {
-                        Destroy(chat.gameObject);
-                        //chatCanvas = chat.gameObject;
+                        chatCanvas = chat.gameObject;
                         //ToastManager.Toast(chat.name); // Log the found canvas
                     }
                 }
@@ -638,7 +637,7 @@ namespace Multiplayer {
 
             if (Player.i == null) return;
 
-            ConfigurePlayerEffectReceiver();
+            //ConfigurePlayerEffectReceiver();
             LoadMinionPrefab();
         }
 
