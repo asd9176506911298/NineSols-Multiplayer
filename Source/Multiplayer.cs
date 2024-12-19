@@ -1,4 +1,5 @@
 ﻿
+using Auto.Utils;
 using BepInEx;
 using BepInEx.Configuration;
 using Dialogue;
@@ -242,11 +243,38 @@ namespace Multiplayer {
             SceneManager.LoadScene(SceneManager.GetActiveScene().name);
         }
 
-       
+        GameObject v = null;
+
 
         void test2() {
             // Array of player object names
             ToastManager.Toast(":goodtimefrog: Za Warudo");
+            //ToastManager.Toast(MonsterManager.Instance.FindClosestMonster().GetComponentsInChildren<SpriteRenderer>());
+            //ToastManager.Toast(MonsterManager.Instance.FindClosestMonster().transform.Find("MonsterCore/Animator(Proxy)/Animator/StealthMonster_GiantBlade"));
+            //v = Instantiate(MonsterManager.Instance.FindClosestMonster().transform.Find("MonsterCore/Animator(Proxy)/Animator/StealthMonster_GiantBlade")).gameObject;
+            
+            //foreach (var x in MonsterManager.Instance.FindClosestMonster().GetComponentsInChildren<SpriteRenderer>()) {
+            //    // Check if the component SpriteFlasher exists
+            //    SpriteFlasher flasher;
+            //    if (x.TryGetComponent<SpriteFlasher>(out flasher)) {
+            //        continue;
+            //    }
+
+            //    // Skip the "Animator" named object
+            //    if (x.name == "Animator")
+            //        continue;
+
+            //    // Instantiate the object at the position with an offset
+            //    Vector3 offset = new Vector3(100, 0, 0);  // Example offset: 100 units on the x-axis
+            //    var i = Instantiate(x.gameObject, x.transform.position + offset, Quaternion.identity);
+            //    instantiatedMonsters.Add(i);  // Store reference to the instantiated object
+
+            //    // Modify the SpriteRenderer's alpha transparency
+            //    SpriteRenderer spriteRenderer = i.GetComponent<SpriteRenderer>();
+            //    Color currentColor = spriteRenderer.color;
+            //    currentColor.a = 0.4f;
+            //    spriteRenderer.color = currentColor;
+            //}
 
             //var sp = GameObject.Find("GameCore(Clone)/RCG LifeCycle/PPlayer/RotateProxy/SpriteHolder/customObject").GetComponent<SpriteRenderer>().sprite;
             ////ToastManager.Toast(sp);
@@ -833,6 +861,53 @@ namespace Multiplayer {
             }
 
             _client.PollEvents();
+
+            if (v) {
+                // Find the target transform
+                Transform targetParent = GameObject.Find("A1_S2_GameLevel/Room/Prefab/Gameplay5/EventBinder/LootProvider/General Boss Fight FSM ObjectA1_S2_大劍兵/FSM Animator/LogicRoot/---Boss---/BossShowHealthArea/StealthGameMonster_Samurai_General_Boss Variant/MonsterCore/Animator(Proxy)/Animator/StealthMonster_GiantBlade").transform;
+
+                if (targetParent != null) {
+                    // Cache the reference to the main object to avoid redundant calls
+                    Transform referenceTransform = GameObject.Find("A1_S2_GameLevel/Room/Prefab/Gameplay5/EventBinder/LootProvider/General Boss Fight FSM ObjectA1_S2_大劍兵/FSM Animator/LogicRoot/---Boss---/BossShowHealthArea/StealthGameMonster_Samurai_General_Boss Variant").transform;
+
+                    if (referenceTransform != null) {
+                        // Negate the localScale.x of `referenceTransform` and apply it to `v`
+                        Vector3 newScale = v.transform.localScale;
+                        newScale.x = -referenceTransform.localScale.x; // Negate the x-axis scale
+                        v.transform.localScale = newScale;
+
+                        // Update `v`'s position to match `targetParent`
+                        v.transform.position = targetParent.position;
+
+                        
+
+                        // You can proceed to update child objects if needed
+                    } else {
+                        Log.Warning("Reference transform not found!");
+                    }
+
+                    var childSprites = targetParent.GetComponentsInChildren<SpriteRenderer>();
+                    var vt = v.GetComponentsInChildren<SpriteRenderer>();
+
+
+                    foreach (var child in childSprites) {
+                        ToastManager.Toast(child.name);
+                        //if (child.name.Contains("StealthMonster_GiantBlade"))
+                        //    continue;
+
+                        //foreach(var g in vt) {
+                        //    g.rotation = child.rotation;
+                        //}
+                    }
+                } else {
+                    Log.Warning("Target parent transform not found!");
+                }
+            }
+
+
+
+
+
 
             // Ensure inputField is not null before accessing
             if (inputField != null) {
