@@ -939,7 +939,7 @@ namespace Multiplayer {
             inputField.transform.SetParent(chatCanvas.transform, false);  // Keep local position unaffected
 
             var rect = inputField.AddComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(380, 30);  // Adjust width and height of the input field
+            rect.sizeDelta = new Vector2(Screen.width, 30);  // Adjust width and height of the input field
             rect.anchorMin = new Vector2(0, 0);  // Anchor it to the bottom-left corner
             rect.anchorMax = new Vector2(0, 0);  // Anchor it to the bottom-left corner
             rect.pivot = new Vector2(0, 0);  // Set pivot at the bottom-left corner
@@ -955,12 +955,12 @@ namespace Multiplayer {
             textObj.transform.SetParent(inputField.transform, false);
 
             var textRect = textObj.AddComponent<RectTransform>();
-            textRect.sizeDelta = new Vector2(360, 25);  // Adjust size of the text input
+            textRect.sizeDelta = new Vector2(Screen.width - 20, 25);  // Adjust size of the text input
             textRect.anchoredPosition = Vector2.zero;
 
             var text = textObj.AddComponent<Text>();
             text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            text.fontSize = 14;
+            text.fontSize = 12;
             text.color = Color.black;  // Input text color
             text.alignment = TextAnchor.MiddleLeft;
 
@@ -971,7 +971,7 @@ namespace Multiplayer {
             placeholderObj.transform.SetParent(inputField.transform, false);
 
             var placeholderRect = placeholderObj.AddComponent<RectTransform>();
-            placeholderRect.sizeDelta = new Vector2(360, 25);
+            placeholderRect.sizeDelta = new Vector2(Screen.width - 20, 25);
             placeholderRect.anchoredPosition = Vector2.zero;
 
             var placeholder = placeholderObj.AddComponent<Text>();
@@ -998,7 +998,7 @@ namespace Multiplayer {
             scrollRect.horizontal = false; // Disable horizontal scrolling
 
             var rect = scrollView.GetComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(400, 130);  // Adjust size to fit the screen or design
+            rect.sizeDelta = new Vector2(Screen.width, 130);  // Adjust size to fit the screen or design
             rect.anchorMin = new Vector2(0, 0);  // Anchor to the bottom-left of the screen
             rect.anchorMax = new Vector2(0, 0);
             rect.anchoredPosition = new Vector2(0, 50);  // Position it in the bottom-left corner
@@ -1015,7 +1015,7 @@ namespace Multiplayer {
             content.transform.SetParent(scrollView.transform);
 
             var contentRect = content.AddComponent<RectTransform>();
-            contentRect.sizeDelta = new Vector2(400, 0); // Start with height 0 and grow dynamically
+            contentRect.sizeDelta = new Vector2(Screen.width, 0); // Start with height 0 and grow dynamically
             contentRect.anchoredPosition = new Vector2(30, 0);
 
             // Add Vertical Layout Group to the content to stack messages vertically
@@ -1050,7 +1050,7 @@ namespace Multiplayer {
             messageObj.transform.SetParent(chatLog.transform, false);  // Keep local position unaffected
 
             var messageRect = messageObj.AddComponent<RectTransform>();
-            messageRect.sizeDelta = new Vector2(380, 50);  // Set width and height (adjust to your needs)
+            messageRect.sizeDelta = new Vector2(Screen.width, 50);  // Set width and height (adjust to your needs)
 
             var text = messageObj.AddComponent<Text>();
             text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
@@ -1091,7 +1091,7 @@ namespace Multiplayer {
 
             var text = messageObj.AddComponent<Text>();
             text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            text.fontSize = 14;
+            text.fontSize = 12;
             text.color = Color.white;  // Input text color
             text.text = playerName.Value + ": " + message;
 
