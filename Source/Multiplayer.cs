@@ -1012,7 +1012,7 @@ namespace Multiplayer {
             content.transform.SetParent(scrollView.transform);
 
             var contentRect = content.AddComponent<RectTransform>();
-            contentRect.sizeDelta = new Vector2(370, 0);
+            contentRect.sizeDelta = new Vector2(360, 0);
             contentRect.anchoredPosition = new Vector2(10, 0);
 
             var verticalLayout = content.AddComponent<VerticalLayoutGroup>();
