@@ -3,8 +3,10 @@ using ChartUtil;
 using HarmonyLib;
 using InControl;
 using InputExtension;
+using LiteNetLib;
 using NineSolsAPI;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Multiplayer {
     [HarmonyPatch]
@@ -12,9 +14,18 @@ namespace Multiplayer {
         [HarmonyPatch(typeof(Animator), "Play", new[] { typeof(string), typeof(int), typeof(float) })]
         [HarmonyPrefix]
         public static bool Prefix(Animator __instance, string stateName, int layer, float normalizedTime) {
+            
             if (__instance.name == "SpriteHolder" && Multiplayer.Instance.localAnimationState != stateName) {
                 Multiplayer.Instance.localAnimationState = stateName;
             }
+
+            if(MonsterManager.Instance.FindClosestMonster() != null) {
+                if (__instance.transform.parent.parent.parent.name == MonsterManager.Instance.FindClosestMonster().name) {
+                    ToastManager.Toast($"same {stateName}");
+                    Multiplayer.Instance.SendEnemy(__instance.transform.parent.parent.parent.name, stateName, __instance.transform.position);
+                }
+            }
+            
 
             return true; // Allow the original method to execute
         }

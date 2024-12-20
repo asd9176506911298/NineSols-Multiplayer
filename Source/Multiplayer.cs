@@ -243,17 +243,67 @@ namespace Multiplayer {
         }
 
         GameObject enemy = null;
+        GameObject g = null;
+
+        void SyncAnimator(Animator sourceAnimator, Animator targetAnimator) {
+            // Copy parameters from sourceAnimator to targetAnimator
+            for (int i = 0; i < sourceAnimator.parameterCount; i++) {
+                var param = sourceAnimator.parameters[i];
+
+                switch (param.type) {
+                    case AnimatorControllerParameterType.Bool:
+                        targetAnimator.SetBool(param.name, sourceAnimator.GetBool(param.name));
+                        break;
+                    case AnimatorControllerParameterType.Float:
+                        targetAnimator.SetFloat(param.name, sourceAnimator.GetFloat(param.name));
+                        break;
+                    case AnimatorControllerParameterType.Int:
+                        targetAnimator.SetInteger(param.name, sourceAnimator.GetInteger(param.name));
+                        break;
+                    case AnimatorControllerParameterType.Trigger:
+                        if (sourceAnimator.GetBool(param.name)) {
+                            targetAnimator.SetTrigger(param.name);
+                        }
+                        break;
+                }
+            }
+
+            // Optionally play the current state of the source animator
+            AnimatorStateInfo sourceState = sourceAnimator.GetCurrentAnimatorStateInfo(0);
+            targetAnimator.Play(sourceState.fullPathHash, 0, sourceState.normalizedTime);
+        }
 
         void test2() {
             // Array of player object names
             ToastManager.Toast(":goodtimefrog: Za Warudo");
 
-            GameObject g = GameObject.Find("A1_S2_GameLevel/Room/Prefab/Gameplay5/EventBinder/LootProvider/General Boss Fight FSM ObjectA1_S2_大劍兵/FSM Animator/LogicRoot/---Boss---/BossShowHealthArea/StealthGameMonster_Samurai_General_Boss Variant/MonsterCore/Animator(Proxy)/Animator");
+            // Locate the original Animator GameObject
+            //g = GameObject.Find("A1_S2_GameLevel/Room/Prefab/Gameplay5/EventBinder/LootProvider/General Boss Fight FSM ObjectA1_S2_大劍兵/FSM Animator/LogicRoot/---Boss---/BossShowHealthArea/StealthGameMonster_Samurai_General_Boss Variant/MonsterCore/Animator(Proxy)/Animator");
+            g = MonsterManager.Instance.FindClosestMonster().transform.Find("MonsterCore/Animator(Proxy)/Animator").gameObject;
 
+            // Get the position of the player and offset the new enemy's position
             var p = Player.i.transform.position;
             var pos = new Vector3(p.x, p.y + 40f, p.z);
+
+            // Instantiate the enemy if not already created
             if (enemy == null)
                 enemy = Instantiate(g, pos, Quaternion.identity);
+
+            var sprites = enemy.GetComponentsInChildren<SpriteRenderer>();
+            foreach(var x in sprites) {
+                Color currentColor = x.color;
+                currentColor.a = 0.4f;
+                x.color = currentColor;
+            }
+
+            //// Copy the Animator properties
+            //var sourceAnimator = g.GetComponent<Animator>();
+            //var targetAnimator = enemy.GetComponent<Animator>();
+
+            //if (sourceAnimator != null && targetAnimator != null) {
+            //    // Synchronize animator parameters
+            //    SyncAnimator(sourceAnimator, targetAnimator);
+            //}
 
             //var sp = GameObject.Find("GameCore(Clone)/RCG LifeCycle/PPlayer/RotateProxy/SpriteHolder/customObject").GetComponent<SpriteRenderer>().sprite;
             ////ToastManager.Toast(sp);
@@ -828,7 +878,44 @@ namespace Multiplayer {
             _playerObjects.Clear();
         }
 
+        void updateEnemy() {
+            Traverse.Create(MonsterManager.Instance).Field("_closetMonster").GetValue<MonsterBase>();
+            return;
+            // Copy the Animator properties
+            var sourceAnimator = g.GetComponent<Animator>();
+            var targetAnimator = enemy.GetComponent<Animator>();
 
+            if (sourceAnimator != null && targetAnimator != null) {
+                // Synchronize animator parameters
+                SyncAnimator(sourceAnimator, targetAnimator);
+            }
+            
+            if (enemy != null) {
+                var anim = enemy.GetComponent<Animator>();
+                if (anim != null) {
+                    // Get the current animation state information
+                    AnimatorStateInfo currentState = anim.GetCurrentAnimatorStateInfo(0);
+
+                    // Only play the animation if it's not already playing
+                    if (!currentState.IsName("Attack1")) {
+                        anim.PlayInFixedTime("Attack1", 0, 0f);
+                    }
+                }
+            }
+        }
+
+        public void SendEnemy(string name, string status, Vector3 pos) {
+            if (_client.IsRunning && _client.FirstPeer?.ConnectionState == ConnectionState.Connected) {
+                _dataWriter.Reset();
+                _dataWriter.Put("Enemy");
+                _dataWriter.Put(name);
+                _dataWriter.Put(status);
+                _dataWriter.Put(pos.x);
+                _dataWriter.Put(pos.y);
+                _dataWriter.Put(pos.z);
+                _client.FirstPeer.Send(_dataWriter, DeliveryMethod.ReliableOrdered);
+            }
+        }
 
         private void Update() {
             if (_client.IsRunning && _client.FirstPeer?.ConnectionState == ConnectionState.Connected) {
@@ -840,6 +927,8 @@ namespace Multiplayer {
             }
 
             _client.PollEvents();
+
+            updateEnemy();
 
             // Ensure inputField is not null before accessing
             if (inputField != null) {
@@ -1263,6 +1352,35 @@ namespace Multiplayer {
                     var msg = reader.GetString();
 
                     ReceiveMessageToChat(msg);
+                    break;
+                case "Enemy":
+                    var enemyName = reader.GetString();
+                    var state = reader.GetString();
+                    var posx = reader.GetFloat();
+                    var posy = reader.GetFloat();
+                    var posz = reader.GetFloat();
+                    foreach(var e in MonsterManager.Instance.monsterDict.Values) {
+                        if (e.name == enemyName) {
+                            g = e.transform.Find("MonsterCore/Animator(Proxy)/Animator").gameObject;
+
+                            var newPos = new Vector3(posx, posy, posz);
+                            // Instantiate the enemy if not already created
+                            if (enemy == null)
+                                enemy = Instantiate(g, newPos, Quaternion.identity);
+                            else
+                                enemy.transform.position = newPos;
+
+                            var sprites = enemy.GetComponentsInChildren<SpriteRenderer>();
+                            foreach (var x in sprites) {
+                                Color currentColor = x.color;
+                                currentColor.a = 0.4f;
+                                x.color = currentColor;
+                            }
+
+
+                        }
+                    }
+                    ToastManager.Toast($"{enemyName} {state} {posx} {posy} {posz}");
                     break;
                 default:
                     ToastManager.Toast(messageType);
