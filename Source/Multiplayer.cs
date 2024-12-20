@@ -873,7 +873,15 @@ namespace Multiplayer {
             _client.Stop();
             _localPlayerId = -1;
             ClearPlayerObjects();
+            ClearEnemyObjects();
             ToastManager.Toast("Disconnected from server.");
+        }
+
+        private void ClearEnemyObjects() {
+            foreach (var enemy in enemyDict.Values) {
+                Destroy(enemy.EnemyObject);
+            }
+            enemyDict.Clear();
         }
 
         private void ClearPlayerObjects() {
