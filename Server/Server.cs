@@ -215,11 +215,12 @@ namespace Server {
                     break;
                 case "Enemy":
                     var guid = reader.GetString();
+                    var playerid = reader.GetInt();
                     var state = reader.GetString();
                     var posx = reader.GetFloat();
                     var posy = reader.GetFloat();
                     var posz = reader.GetFloat();
-                    SendEnemy(guid, state,posx,posy,posz, peer);
+                    SendEnemy(guid, playerid, state,posx,posy,posz, peer);
                     Console.WriteLine($"{guid} {state} {posx} {posy} {posz}");
                     
                     break;
@@ -230,10 +231,11 @@ namespace Server {
             reader.Recycle();
         }
 
-        private static void SendEnemy(string guid, string state, float x,float y,float z, NetPeer excludePeer) {
+        private static void SendEnemy(string guid,int playerId, string state, float x,float y,float z, NetPeer excludePeer) {
             _writer = new NetDataWriter();
             _writer.Put("Enemy");
             _writer.Put(guid);
+            _writer.Put(playerId);
             _writer.Put(state);
             _writer.Put(x);
             _writer.Put(y);

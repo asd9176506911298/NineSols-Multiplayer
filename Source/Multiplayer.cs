@@ -913,6 +913,7 @@ namespace Multiplayer {
                 _dataWriter.Reset();
                 _dataWriter.Put("Enemy");
                 _dataWriter.Put(uniqueID);  // Send unique ID
+                _dataWriter.Put(_localPlayerId);  // Send unique ID
                 _dataWriter.Put(status);
                 _dataWriter.Put(pos.x);
                 _dataWriter.Put(pos.y);
@@ -924,6 +925,7 @@ namespace Multiplayer {
 
         void HandleEnemyUpdate(NetDataReader reader) {
             var enemyID = reader.GetString(); // Use a unique ID instead of enemyName
+            var playerId = reader.GetInt(); // Use a unique ID instead of enemyName
             var state = reader.GetString();
             var posx = reader.GetFloat();
             var posy = reader.GetFloat();
@@ -937,10 +939,10 @@ namespace Multiplayer {
                     var newPos = new Vector3(posx, posy + 40f, posz);
 
                     // Check if this enemy already exists in the dictionary
-                    if (!enemyDict.TryGetValue(enemyID, out var enemy)) {
+                    if (!enemyDict.TryGetValue(playerId.ToString(), out var enemy)) {
                         // Instantiate the enemy if not already created
                         enemy = Instantiate(g, newPos, Quaternion.identity);
-                        enemyDict[enemyID] = enemy;
+                        enemyDict[playerId.ToString()] = enemy;
 
                         // Set transparency for the new enemy
                         var sprites = enemy.GetComponentsInChildren<SpriteRenderer>();
