@@ -1,4 +1,5 @@
 ﻿
+using Auto.Utils;
 using BepInEx;
 using BepInEx.Configuration;
 using Dialogue;
@@ -49,7 +50,7 @@ namespace Multiplayer {
         GameObject minionPrefab = null;
 
         public readonly Dictionary<int, PlayerData> _playerObjects = new();
-        private Dictionary<string, GameObject> enemyDict = new Dictionary<string, GameObject>(); // Track enemies by unique ID
+        private Dictionary<string, EnemyData> enemyDict = new Dictionary<string, EnemyData>(); // Track enemies by unique ID
 
 
 
@@ -924,40 +925,50 @@ namespace Multiplayer {
 
 
         void HandleEnemyUpdate(NetDataReader reader) {
-            var enemyID = reader.GetString(); // Use a unique ID instead of enemyName
-            var playerId = reader.GetInt(); // Use a unique ID instead of enemyName
-            var state = reader.GetString();
+            var enemyID = reader.GetString(); // Unique enemy ID
+            var playerId = reader.GetInt();   // Unique player ID
+            var state = reader.GetString();   // State of the enemy (optional)
             var posx = reader.GetFloat();
             var posy = reader.GetFloat();
             var posz = reader.GetFloat();
 
+            // Loop through existing enemies in MonsterManager
             foreach (var e in MonsterManager.Instance.monsterDict.Values) {
-                // Ensure the unique identifier matches
-                if (e.ActorID == enemyID) { // Assume `GetUniqueID` returns a unique ID for the monster
+                // Match the enemy by its unique ID
+                if (e.ActorID == enemyID) {
                     GameObject g = e.transform.Find("MonsterCore/Animator(Proxy)/Animator").gameObject;
 
                     var newPos = new Vector3(posx, posy + 40f, posz);
 
-                    // Check if this enemy already exists in the dictionary
-                    if (!enemyDict.TryGetValue(playerId.ToString(), out var enemy)) {
+                    // Check if this enemy already exists for the player
+                    if (!enemyDict.TryGetValue(playerId.ToString(), out var enemyData)) {
                         // Instantiate the enemy if not already created
-                        enemy = Instantiate(g, newPos, Quaternion.identity);
-                        enemyDict[playerId.ToString()] = enemy;
+                        enemyData = new EnemyData(Instantiate(g, newPos, Quaternion.identity), enemyID);
+                        enemyDict[playerId.ToString()] = enemyData;
 
                         // Set transparency for the new enemy
-                        var sprites = enemy.GetComponentsInChildren<SpriteRenderer>();
-                        foreach (var x in sprites) {
-                            Color currentColor = x.color;
-                            currentColor.a = 0.4f;
-                            x.color = currentColor;
+                        var sprites = enemyData.EnemyObject.GetComponentsInChildren<SpriteRenderer>();
+                        foreach (var sprite in sprites) {
+                            var currentColor = sprite.color;
+                            currentColor.a = 0.4f; // Set transparency
+                            sprite.color = currentColor;
                         }
                     } else {
-                        // Update position of the existing enemy
-                        enemy.transform.position = newPos;
+                        // Check if the enemy's unique ID has changed
+                        if (enemyData.guid != enemyID) {
+                            // Destroy the old enemy and instantiate a new one
+                            Destroy(enemyData.EnemyObject);
+                            enemyData.EnemyObject = Instantiate(g, newPos, Quaternion.identity);
+                            enemyData.guid = enemyID;
+                        }
+
+                        // Update the position of the existing enemy
+                        enemyData.EnemyObject.transform.position = newPos;
                     }
                 }
             }
         }
+
 
         private void Update() {
             if (_client.IsRunning && _client.FirstPeer?.ConnectionState == ConnectionState.Connected) {
