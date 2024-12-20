@@ -922,6 +922,9 @@ namespace Multiplayer {
                 _sendTimer += Time.deltaTime;
                 if (_sendTimer >= SendInterval) {
                     SendPosition();
+                    var m = MonsterManager.Instance.FindClosestMonster();
+                    if(m != null)
+                        SendEnemy(m.name, "", m.transform.position);
                     _sendTimer = 0;
                 }
             }
@@ -1363,7 +1366,7 @@ namespace Multiplayer {
                         if (e.name == enemyName) {
                             g = e.transform.Find("MonsterCore/Animator(Proxy)/Animator").gameObject;
 
-                            var newPos = new Vector3(posx, posy, posz);
+                            var newPos = new Vector3(posx, posy + 40f, posz);
                             // Instantiate the enemy if not already created
                             if (enemy == null)
                                 enemy = Instantiate(g, newPos, Quaternion.identity);
@@ -1376,11 +1379,9 @@ namespace Multiplayer {
                                 currentColor.a = 0.4f;
                                 x.color = currentColor;
                             }
-
-
                         }
                     }
-                    ToastManager.Toast($"{enemyName} {state} {posx} {posy} {posz}");
+                    //ToastManager.Toast($"{enemyName} {state} {posx} {posy} {posz}");
                     break;
                 default:
                     ToastManager.Toast(messageType);
