@@ -49,6 +49,10 @@ namespace Multiplayer {
         GameObject minionPrefab = null;
 
         public readonly Dictionary<int, PlayerData> _playerObjects = new();
+        private Dictionary<string, GameObject> enemyDict = new Dictionary<string, GameObject>(); // Track enemies by unique ID
+
+
+
         private int _localPlayerId = -1;
         private const float SendInterval = 0.02f;
         private float _sendTimer;
@@ -904,16 +908,52 @@ namespace Multiplayer {
             }
         }
 
-        public void SendEnemy(string name, string status, Vector3 pos) {
+        public void SendEnemy(string uniqueID, string status, Vector3 pos) {
             if (_client.IsRunning && _client.FirstPeer?.ConnectionState == ConnectionState.Connected) {
                 _dataWriter.Reset();
                 _dataWriter.Put("Enemy");
-                _dataWriter.Put(name);
+                _dataWriter.Put(uniqueID);  // Send unique ID
                 _dataWriter.Put(status);
                 _dataWriter.Put(pos.x);
                 _dataWriter.Put(pos.y);
                 _dataWriter.Put(pos.z);
                 _client.FirstPeer.Send(_dataWriter, DeliveryMethod.ReliableOrdered);
+            }
+        }
+
+
+        void HandleEnemyUpdate(NetDataReader reader) {
+            var enemyID = reader.GetString(); // Use a unique ID instead of enemyName
+            var state = reader.GetString();
+            var posx = reader.GetFloat();
+            var posy = reader.GetFloat();
+            var posz = reader.GetFloat();
+
+            foreach (var e in MonsterManager.Instance.monsterDict.Values) {
+                // Ensure the unique identifier matches
+                if (e.ActorID == enemyID) { // Assume `GetUniqueID` returns a unique ID for the monster
+                    GameObject g = e.transform.Find("MonsterCore/Animator(Proxy)/Animator").gameObject;
+
+                    var newPos = new Vector3(posx, posy + 40f, posz);
+
+                    // Check if this enemy already exists in the dictionary
+                    if (!enemyDict.TryGetValue(enemyID, out var enemy)) {
+                        // Instantiate the enemy if not already created
+                        enemy = Instantiate(g, newPos, Quaternion.identity);
+                        enemyDict[enemyID] = enemy;
+
+                        // Set transparency for the new enemy
+                        var sprites = enemy.GetComponentsInChildren<SpriteRenderer>();
+                        foreach (var x in sprites) {
+                            Color currentColor = x.color;
+                            currentColor.a = 0.4f;
+                            x.color = currentColor;
+                        }
+                    } else {
+                        // Update position of the existing enemy
+                        enemy.transform.position = newPos;
+                    }
+                }
             }
         }
 
@@ -924,7 +964,7 @@ namespace Multiplayer {
                     SendPosition();
                     var m = MonsterManager.Instance.FindClosestMonster();
                     if(m != null)
-                        SendEnemy(m.name, "", m.transform.position);
+                        SendEnemy(m.ActorID, "", m.transform.position);
                     _sendTimer = 0;
                 }
             }
@@ -1357,30 +1397,7 @@ namespace Multiplayer {
                     ReceiveMessageToChat(msg);
                     break;
                 case "Enemy":
-                    var enemyName = reader.GetString();
-                    var state = reader.GetString();
-                    var posx = reader.GetFloat();
-                    var posy = reader.GetFloat();
-                    var posz = reader.GetFloat();
-                    foreach(var e in MonsterManager.Instance.monsterDict.Values) {
-                        if (e.name == enemyName) {
-                            g = e.transform.Find("MonsterCore/Animator(Proxy)/Animator").gameObject;
-
-                            var newPos = new Vector3(posx, posy + 40f, posz);
-                            // Instantiate the enemy if not already created
-                            if (enemy == null)
-                                enemy = Instantiate(g, newPos, Quaternion.identity);
-                            else
-                                enemy.transform.position = newPos;
-
-                            var sprites = enemy.GetComponentsInChildren<SpriteRenderer>();
-                            foreach (var x in sprites) {
-                                Color currentColor = x.color;
-                                currentColor.a = 0.4f;
-                                x.color = currentColor;
-                            }
-                        }
-                    }
+                    HandleEnemyUpdate(reader);
                     //ToastManager.Toast($"{enemyName} {state} {posx} {posy} {posz}");
                     break;
                 default:

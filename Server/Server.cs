@@ -214,13 +214,13 @@ namespace Server {
                     SendChat(msg, peer);
                     break;
                 case "Enemy":
-                    var enemyName = reader.GetString();
+                    var guid = reader.GetString();
                     var state = reader.GetString();
                     var posx = reader.GetFloat();
                     var posy = reader.GetFloat();
                     var posz = reader.GetFloat();
-                    SendEnemy(enemyName,state,posx,posy,posz, peer);
-                    Console.WriteLine($"{enemyName} {state} {posx} {posy} {posz}");
+                    SendEnemy(guid, state,posx,posy,posz, peer);
+                    Console.WriteLine($"{guid} {state} {posx} {posy} {posz}");
                     
                     break;
                 default:
@@ -230,10 +230,10 @@ namespace Server {
             reader.Recycle();
         }
 
-        private static void SendEnemy(string enemyName, string state, float x,float y,float z, NetPeer excludePeer) {
+        private static void SendEnemy(string guid, string state, float x,float y,float z, NetPeer excludePeer) {
             _writer = new NetDataWriter();
             _writer.Put("Enemy");
-            _writer.Put(enemyName);
+            _writer.Put(guid);
             _writer.Put(state);
             _writer.Put(x);
             _writer.Put(y);
