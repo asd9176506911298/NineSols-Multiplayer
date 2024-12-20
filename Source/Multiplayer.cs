@@ -917,12 +917,13 @@ namespace Multiplayer {
             }
         }
 
-        public void SendEnemy(string uniqueID, string status, Vector3 pos) {
+        public void SendEnemy(string uniqueID, float health, string status, Vector3 pos) {
             if (_client.IsRunning && _client.FirstPeer?.ConnectionState == ConnectionState.Connected) {
                 _dataWriter.Reset();
                 _dataWriter.Put("Enemy");
                 _dataWriter.Put(uniqueID);  // Send unique ID
                 _dataWriter.Put(_localPlayerId);  // Send unique ID
+                _dataWriter.Put(health);  // Send unique ID
                 _dataWriter.Put(status);
                 _dataWriter.Put(pos.x);
                 _dataWriter.Put(pos.y);
@@ -935,6 +936,7 @@ namespace Multiplayer {
         void HandleEnemyUpdate(NetDataReader reader) {
             var enemyID = reader.GetString(); // Unique enemy ID
             var playerId = reader.GetInt();   // Unique player ID
+            var health = reader.GetFloat();   // Health of the enemy
             var state = reader.GetString();   // State of the enemy (optional)
             var posx = reader.GetFloat();
             var posy = reader.GetFloat();
@@ -951,18 +953,27 @@ namespace Multiplayer {
                     // Check if this enemy already exists for the player
                     if (!enemyDict.TryGetValue(playerId.ToString(), out var enemyData)) {
                         // Instantiate the enemy if not already created
-                        enemyData = new EnemyData(Instantiate(g, newPos, Quaternion.identity), enemyID);
-                        enemyDict[playerId.ToString()] = enemyData;
+                        if (health > 0) {
+                            enemyData = new EnemyData(Instantiate(g, newPos, Quaternion.identity), enemyID);
+                            enemyDict[playerId.ToString()] = enemyData;
 
-                        // Set transparency for the new enemy
-                        var sprites = enemyData.EnemyObject.GetComponentsInChildren<SpriteRenderer>();
-                        foreach (var sprite in sprites) {
-                            var currentColor = sprite.color;
-                            currentColor.a = 0.4f; // Set transparency
-                            sprite.color = currentColor;
+                            // Set transparency for the new enemy
+                            var sprites = enemyData.EnemyObject.GetComponentsInChildren<SpriteRenderer>();
+                            foreach (var sprite in sprites) {
+                                var currentColor = sprite.color;
+                                currentColor.a = 0.4f; // Set transparency
+                                sprite.color = currentColor;
+                            }
                         }
                     } else {
-                        // Check if the enemy's unique ID has changed
+                        // Handle enemy death
+                        if (health <= 0) {
+                            Destroy(enemyData.EnemyObject);
+                            enemyDict.Remove(playerId.ToString()); // Remove reference from dictionary
+                            continue; // Skip further processing for this enemy
+                        }
+
+                        // Check if the enemy's unique ID has changed (indicating a replacement)
                         if (enemyData.guid != enemyID) {
                             // Destroy the old enemy and instantiate a new one
                             Destroy(enemyData.EnemyObject);
@@ -978,6 +989,7 @@ namespace Multiplayer {
         }
 
 
+
         private void Update() {
             if (_client.IsRunning && _client.FirstPeer?.ConnectionState == ConnectionState.Connected) {
                 _sendTimer += Time.deltaTime;
@@ -985,7 +997,7 @@ namespace Multiplayer {
                     SendPosition();
                     var m = MonsterManager.Instance.FindClosestMonster();
                     if(m != null)
-                        SendEnemy(m.ActorID, "", m.transform.position);
+                        SendEnemy(m.ActorID,m.postureSystem.CurrentHealthValue, "", m.transform.position);
                     _sendTimer = 0;
                 }
             }
