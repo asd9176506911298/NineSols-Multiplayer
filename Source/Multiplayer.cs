@@ -944,12 +944,12 @@ namespace Multiplayer {
             var posy = reader.GetFloat();
             var posz = reader.GetFloat();
             var isFacingRight = reader.GetBool();
-
+            
             // Loop through existing enemies in MonsterManager
             foreach (var e in MonsterManager.Instance.monsterDict.Values) {
                 // Match the enemy by its unique ID
                 if (e.ActorID == enemyID) {
-                    GameObject g = e.transform.Find("MonsterCore/Animator(Proxy)/Animator").gameObject;
+                    GameObject g = e.gameObject;
 
                     var newPos = new Vector3(posx, posy, posz);
 
@@ -967,10 +967,13 @@ namespace Multiplayer {
                                 currentColor.a = 0.4f; // Set transparency
                                 sprite.color = currentColor;
                             }
+
+                            Debug.Log($"Created new enemy for Player {playerId}: Enemy ID: {enemyID}");
                         }
                     } else {
                         // Handle enemy death
                         if (health <= 0) {
+                            Debug.Log($"Enemy {enemyData.guid} for Player {playerId} has died. Removing.");
                             Destroy(enemyData.EnemyObject);
                             enemyDict.Remove(playerId.ToString()); // Remove reference from dictionary
                             continue; // Skip further processing for this enemy
@@ -978,30 +981,39 @@ namespace Multiplayer {
 
                         // Check if the enemy's unique ID has changed (indicating a replacement)
                         if (enemyData.guid != enemyID) {
-                            // Destroy the old enemy and instantiate a new one
+                            Debug.Log($"Replacing enemy for Player {playerId}: Old GUID: {enemyData.guid}, New GUID: {enemyID}");
                             Destroy(enemyData.EnemyObject);
                             enemyData.EnemyObject = Instantiate(g, newPos, Quaternion.identity);
                             enemyData.guid = enemyID;
+
+                            // Explicitly reassign for clarity
+                            enemyDict[playerId.ToString()] = enemyData;
                         }
 
                         // Update the position of the existing enemy
-                        enemyData.EnemyObject.transform.position = newPos;
+                        enemyData.EnemyObject.transform.Find("MonsterCore/Animator(Proxy)/Animator").position = newPos;
+
+                        // Flip the enemy based on facing direction
                         var scale = enemyData.EnemyObject.transform.localScale;
-                        scale.x = Mathf.Abs(scale.x) * (isFacingRight ? 1 : -1);
-                        enemyData.EnemyObject.transform.localScale = scale;
-                        var animator = enemyData.EnemyObject.GetComponent<Animator>();
+                        scale.x = scale.x * (isFacingRight ? 1 : -1);
+                        enemyData.EnemyObject.transform.Find("MonsterCore/Animator(Proxy)/Animator").transform.localScale = scale;
+
+                        // Update animation state
+                        var animator = enemyData.EnemyObject.transform.Find("MonsterCore/Animator(Proxy)/Animator").GetComponent<Animator>();
                         if (animator != null) {
                             AnimatorStateInfo currentState = animator.GetCurrentAnimatorStateInfo(0);
 
+                            // Play the animation only if it's not already playing
                             if (!currentState.IsName(state)) {
+                                Debug.Log($"Playing animation '{state}' for Enemy {enemyID} of Player {playerId}");
                                 animator.Play(state, 0, 0f);
                             }
                         }
-
                     }
                 }
             }
         }
+
 
 
 
