@@ -222,7 +222,7 @@ namespace Server {
                     var posy = reader.GetFloat();
                     var posz = reader.GetFloat();
                     SendEnemy(guid, playerid, health, state,posx,posy,posz, peer);
-                    Console.WriteLine($"{guid} {state} {posx} {posy} {posz}");
+                    Console.WriteLine($"{playerid} {state}");
                     
                     break;
                 default:

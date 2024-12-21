@@ -60,6 +60,7 @@ namespace Multiplayer {
 
         private string? currentAnimationState = string.Empty;
         public string? localAnimationState = "";
+        public string? enemyAnimationState = "";
 
         private GameObject chatCanvas;
         private GameObject inputField;
@@ -892,8 +893,8 @@ namespace Multiplayer {
         }
 
         void updateEnemy() {
-            Traverse.Create(MonsterManager.Instance).Field("_closetMonster").GetValue<MonsterBase>();
             return;
+            Traverse.Create(MonsterManager.Instance).Field("_closetMonster").GetValue<MonsterBase>();
             // Copy the Animator properties
             var sourceAnimator = g.GetComponent<Animator>();
             var targetAnimator = enemy.GetComponent<Animator>();
@@ -917,14 +918,14 @@ namespace Multiplayer {
             }
         }
 
-        public void SendEnemy(string uniqueID, float health, string status, Vector3 pos) {
+        public void SendEnemy(string uniqueID, float health, Vector3 pos) {
             if (_client.IsRunning && _client.FirstPeer?.ConnectionState == ConnectionState.Connected) {
                 _dataWriter.Reset();
                 _dataWriter.Put("Enemy");
                 _dataWriter.Put(uniqueID);  // Send unique ID
                 _dataWriter.Put(_localPlayerId);  // Send unique ID
                 _dataWriter.Put(health);  // Send unique ID
-                _dataWriter.Put(status);
+                _dataWriter.Put(enemyAnimationState);
                 _dataWriter.Put(pos.x);
                 _dataWriter.Put(pos.y);
                 _dataWriter.Put(pos.z);
@@ -983,6 +984,15 @@ namespace Multiplayer {
 
                         // Update the position of the existing enemy
                         enemyData.EnemyObject.transform.position = newPos;
+                        var animator = enemyData.EnemyObject.GetComponent<Animator>();
+                        if (animator != null) {
+                            AnimatorStateInfo currentState = animator.GetCurrentAnimatorStateInfo(0);
+
+                            if (!currentState.IsName(state)) {
+                                animator.Play(state, 0, 0f);
+                            }
+                        }
+
                     }
                 }
             }
@@ -997,7 +1007,7 @@ namespace Multiplayer {
                     SendPosition();
                     var m = MonsterManager.Instance.FindClosestMonster();
                     if(m != null)
-                        SendEnemy(m.ActorID,m.postureSystem.CurrentHealthValue, "", m.transform.position);
+                        SendEnemy(m.ActorID,m.postureSystem.CurrentHealthValue, m.transform.position);
                     _sendTimer = 0;
                 }
             }
