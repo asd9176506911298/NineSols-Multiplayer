@@ -298,7 +298,7 @@ namespace Multiplayer {
             var sprites = enemy.GetComponentsInChildren<SpriteRenderer>();
             foreach(var x in sprites) {
                 Color currentColor = x.color;
-                currentColor.a = 0.4f;
+                currentColor.a = 0.5f;
                 x.color = currentColor;
             }
 
@@ -951,7 +951,7 @@ namespace Multiplayer {
                 if (e.ActorID == enemyID) {
                     GameObject g = e.transform.Find("MonsterCore/Animator(Proxy)/Animator").gameObject;
 
-                    var newPos = new Vector3(posx, posy + 40f, posz);
+                    var newPos = new Vector3(posx, posy, posz);
 
                     // Check if this enemy already exists for the player
                     if (!enemyDict.TryGetValue(playerId.ToString(), out var enemyData)) {
@@ -1011,8 +1011,11 @@ namespace Multiplayer {
                 if (_sendTimer >= SendInterval) {
                     SendPosition();
                     var m = MonsterManager.Instance.FindClosestMonster();
-                    if(m != null)
-                        SendEnemy(m.ActorID,m.postureSystem.CurrentHealthValue, m.transform.position, m.Facing.ToString() == "Right");
+                    
+                    if (m != null) {
+                        var pos = m.transform.Find("MonsterCore/Animator(Proxy)/Animator").position;
+                        SendEnemy(m.ActorID,m.postureSystem.CurrentHealthValue, pos, m.Facing.ToString() == "Right");
+                    }
                     _sendTimer = 0;
                 }
             }

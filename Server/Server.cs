@@ -223,7 +223,7 @@ namespace Server {
                     var posz = reader.GetFloat();
                     var isFacingRight = reader.GetBool();
                     SendEnemy(guid, playerid, health, state, posx, posy, posz, isFacingRight, peer);
-                    Console.WriteLine($"{playerid} {state} {isFacingRight}");
+                    //Console.WriteLine($"{playerid} {state} {isFacingRight}");
                     
                     break;
                 default:
