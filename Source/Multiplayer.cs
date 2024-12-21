@@ -918,7 +918,7 @@ namespace Multiplayer {
             }
         }
 
-        public void SendEnemy(string uniqueID, float health, Vector3 pos) {
+        public void SendEnemy(string uniqueID, float health, Vector3 pos,bool isFacingRight) {
             if (_client.IsRunning && _client.FirstPeer?.ConnectionState == ConnectionState.Connected) {
                 _dataWriter.Reset();
                 _dataWriter.Put("Enemy");
@@ -929,6 +929,7 @@ namespace Multiplayer {
                 _dataWriter.Put(pos.x);
                 _dataWriter.Put(pos.y);
                 _dataWriter.Put(pos.z);
+                _dataWriter.Put(isFacingRight);
                 _client.FirstPeer.Send(_dataWriter, DeliveryMethod.ReliableOrdered);
             }
         }
@@ -942,6 +943,7 @@ namespace Multiplayer {
             var posx = reader.GetFloat();
             var posy = reader.GetFloat();
             var posz = reader.GetFloat();
+            var isFacingRight = reader.GetBool();
 
             // Loop through existing enemies in MonsterManager
             foreach (var e in MonsterManager.Instance.monsterDict.Values) {
@@ -984,6 +986,9 @@ namespace Multiplayer {
 
                         // Update the position of the existing enemy
                         enemyData.EnemyObject.transform.position = newPos;
+                        var scale = enemyData.EnemyObject.transform.localScale;
+                        scale.x = Mathf.Abs(scale.x) * (isFacingRight ? 1 : -1);
+                        enemyData.EnemyObject.transform.localScale = scale;
                         var animator = enemyData.EnemyObject.GetComponent<Animator>();
                         if (animator != null) {
                             AnimatorStateInfo currentState = animator.GetCurrentAnimatorStateInfo(0);
@@ -1007,7 +1012,7 @@ namespace Multiplayer {
                     SendPosition();
                     var m = MonsterManager.Instance.FindClosestMonster();
                     if(m != null)
-                        SendEnemy(m.ActorID,m.postureSystem.CurrentHealthValue, m.transform.position);
+                        SendEnemy(m.ActorID,m.postureSystem.CurrentHealthValue, m.transform.position, m.Facing.ToString() == "Right");
                     _sendTimer = 0;
                 }
             }

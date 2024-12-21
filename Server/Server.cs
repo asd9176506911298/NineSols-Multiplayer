@@ -221,8 +221,9 @@ namespace Server {
                     var posx = reader.GetFloat();
                     var posy = reader.GetFloat();
                     var posz = reader.GetFloat();
-                    SendEnemy(guid, playerid, health, state,posx,posy,posz, peer);
-                    Console.WriteLine($"{playerid} {state}");
+                    var isFacingRight = reader.GetBool();
+                    SendEnemy(guid, playerid, health, state, posx, posy, posz, isFacingRight, peer);
+                    Console.WriteLine($"{playerid} {state} {isFacingRight}");
                     
                     break;
                 default:
@@ -232,7 +233,7 @@ namespace Server {
             reader.Recycle();
         }
 
-        private static void SendEnemy(string guid,int playerId,float health, string state, float x,float y,float z, NetPeer excludePeer) {
+        private static void SendEnemy(string guid,int playerId,float health, string state, float x,float y,float z,bool isFacingRight, NetPeer excludePeer) {
             _writer = new NetDataWriter();
             _writer.Put("Enemy");
             _writer.Put(guid);
@@ -242,6 +243,7 @@ namespace Server {
             _writer.Put(x);
             _writer.Put(y);
             _writer.Put(z);
+            _writer.Put(isFacingRight);
 
             foreach (var peer in _server.ConnectedPeerList) {
                 if (peer != excludePeer) {
