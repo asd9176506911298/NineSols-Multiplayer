@@ -1587,6 +1587,11 @@ namespace Multiplayer {
                 Destroy(playerData.PlayerObject);
                 _playerObjects.Remove(playerId);
             }
+
+            if (enemyDict.TryGetValue(playerId.ToString(), out var enemyData)) {
+                Destroy(enemyData.EnemyObject);
+                enemyDict.Remove(playerId.ToString());
+            }
         }
 
         string GetGameObjectPath(GameObject obj) {
