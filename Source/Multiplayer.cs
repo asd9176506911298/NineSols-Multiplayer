@@ -975,6 +975,11 @@ namespace Multiplayer {
                                 Destroy(hint.gameObject);
                             }
 
+                            var weak = enemyData.EnemyObject.GetComponentsInChildren<WeaknessEffectManager>();
+                            foreach (var w in weak) {
+                                Destroy(w.gameObject);
+                            }
+
                             Log.Info($"Created new enemy for Player {playerId}: Enemy ID: {enemyID}");
                         }
                     } else {
