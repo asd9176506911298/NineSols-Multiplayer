@@ -134,8 +134,12 @@ namespace Server {
 
         private static void HandlePeerConnected(NetPeer peer) {
             Console.WriteLine($"Player {peer.Id} connected.");
-            AddNewPlayer(peer);
-            SendLocalPlayerId(peer);
+            if (!_players.ContainsKey(peer.Id)) {
+                AddNewPlayer(peer);
+                SendLocalPlayerId(peer);
+            } else {
+                Console.WriteLine($"Player {peer.Id} already exists in dictionary.");
+            }
 
             _writer = new NetDataWriter();
             _writer.Put("PvPEnabled");
@@ -182,14 +186,19 @@ namespace Server {
                     break;
                 case "Join":
                     var name = reader.GetString();
-                    _players[peer.Id].name = name;
-                    var playersName = "";
-                    foreach (var x in _players.Values) {
-                        playersName += ", "+ x.name;
+                    if (_players.TryGetValue(peer.Id, out var playerData)) {
+                        playerData.name = name;
+                        var playersName = "";
+                        foreach (var x in _players.Values) {
+                            playersName += ", " + x.name;
+                        }
+                        Console.WriteLine(playersName);
+                        BroadcastSystemMessage($"{name} connected. Player Count:{_server.ConnectedPeersCount}\n{playersName}", peer);
+                    } else {
+                        Console.WriteLine($"Player {peer.Id} not found in the players dictionary.");
                     }
-                    Console.WriteLine(playersName);
-                    BroadcastSystemMessage($"{name} connected. Player Count:{_server.ConnectedPeersCount}\n{playersName}", peer);
                     break;
+
                 case "Leave":
                     var namee = reader.GetString();
                     BroadcastSystemMessage($"{namee} disconnected. Player Count:{_server.ConnectedPeersCount}", peer);
@@ -201,13 +210,18 @@ namespace Server {
                     break;
                 case "GetName":
                     var playerId = reader.GetInt();
-                    Console.WriteLine(_players[playerId].name);
-                    _writer = new NetDataWriter();
-                    _writer.Put("GetName");
-                    _writer.Put(playerId);
-                    _writer.Put(_players[playerId].name);
-                    peer.Send(_writer, DeliveryMethod.Unreliable);
+                    if (_players.TryGetValue(playerId, out var targetPlayer)) {
+                        Console.WriteLine(targetPlayer.name);
+                        _writer = new NetDataWriter();
+                        _writer.Put("GetName");
+                        _writer.Put(playerId);
+                        _writer.Put(targetPlayer.name);
+                        peer.Send(_writer, DeliveryMethod.Unreliable);
+                    } else {
+                        Console.WriteLine($"Player ID {playerId} not found in dictionary.");
+                    }
                     break;
+
                 case "Chat":
                     var msg = reader.GetString();
                     Console.WriteLine(msg);
@@ -246,10 +260,11 @@ namespace Server {
             _writer.Put(isFacingRight);
 
             foreach (var peer in _server.ConnectedPeerList) {
-                if (peer != excludePeer) {
+                if (peer != excludePeer && _players.ContainsKey(peer.Id)) {
                     peer.Send(_writer, DeliveryMethod.ReliableOrdered);
                 }
             }
+
         }
 
         private static void SendChat(string msg, NetPeer excludePeer) {
@@ -320,8 +335,13 @@ namespace Server {
         }
 
         private static void RemovePlayer(int playerId) {
-            _players.TryRemove(playerId, out _);
+            if (_players.TryRemove(playerId, out _)) {
+                Console.WriteLine($"Removed player: {playerId}");
+            } else {
+                Console.WriteLine($"Failed to remove player: {playerId}. Not found in dictionary.");
+            }
         }
+
 
         private static void SendLocalPlayerId(NetPeer peer) {
             _writer = new NetDataWriter();

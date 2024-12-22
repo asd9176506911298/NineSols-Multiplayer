@@ -952,14 +952,16 @@ namespace Multiplayer {
                     GameObject g = e.gameObject;
 
                     var newPos = new Vector3(posx, posy, posz);
-
+                    if (playerId == -1) return;
                     // Check if this enemy already exists for the player
                     if (!enemyDict.TryGetValue(playerId.ToString(), out var enemyData)) {
                         // Instantiate the enemy if not already created
                         if (health > 0) {
                             enemyData = new EnemyData(Instantiate(g, newPos, Quaternion.identity), enemyID);
                             enemyDict[playerId.ToString()] = enemyData;
-
+                            if (!enemyData.EnemyObject.activeSelf) {
+                                enemyData.EnemyObject.SetActive(true);
+                            }
                             // Set transparency for the new enemy
                             var sprites = enemyData.EnemyObject.GetComponentsInChildren<SpriteRenderer>();
                             foreach (var sprite in sprites) {
@@ -968,12 +970,12 @@ namespace Multiplayer {
                                 sprite.color = currentColor;
                             }
 
-                            Debug.Log($"Created new enemy for Player {playerId}: Enemy ID: {enemyID}");
+                            Log.Info($"Created new enemy for Player {playerId}: Enemy ID: {enemyID}");
                         }
                     } else {
                         // Handle enemy death
                         if (health <= 0) {
-                            Debug.Log($"Enemy {enemyData.guid} for Player {playerId} has died. Removing.");
+                            Log.Info($"Enemy {enemyData.guid} for Player {playerId} has died. Removing.");
                             Destroy(enemyData.EnemyObject);
                             enemyDict.Remove(playerId.ToString()); // Remove reference from dictionary
                             continue; // Skip further processing for this enemy
@@ -981,10 +983,17 @@ namespace Multiplayer {
 
                         // Check if the enemy's unique ID has changed (indicating a replacement)
                         if (enemyData.guid != enemyID) {
-                            Debug.Log($"Replacing enemy for Player {playerId}: Old GUID: {enemyData.guid}, New GUID: {enemyID}");
+                            Log.Info($"Replacing enemy for Player {playerId}: Old GUID: {enemyData.guid}, New GUID: {enemyID}");
                             Destroy(enemyData.EnemyObject);
                             enemyData.EnemyObject = Instantiate(g, newPos, Quaternion.identity);
                             enemyData.guid = enemyID;
+
+                            var sprites = enemyData.EnemyObject.GetComponentsInChildren<SpriteRenderer>();
+                            foreach (var sprite in sprites) {
+                                var currentColor = sprite.color;
+                                currentColor.a = 0.4f; // Set transparency
+                                sprite.color = currentColor;
+                            }
 
                             // Explicitly reassign for clarity
                             enemyDict[playerId.ToString()] = enemyData;
@@ -1005,7 +1014,7 @@ namespace Multiplayer {
 
                             // Play the animation only if it's not already playing
                             if (!currentState.IsName(state)) {
-                                Debug.Log($"Playing animation '{state}' for Enemy {enemyID} of Player {playerId}");
+                                Log.Info($"Playing animation '{state}' for Enemy {enemyID} of Player {playerId}");
                                 animator.Play(state, 0, 0f);
                             }
                         }
