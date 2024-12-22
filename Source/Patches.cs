@@ -19,14 +19,20 @@ namespace Multiplayer {
                 Multiplayer.Instance.localAnimationState = stateName;
             }
 
-            if (MonsterManager.Instance.FindClosestMonster() != null) {
-                if (__instance.transform.parent.parent.parent.name == MonsterManager.Instance.FindClosestMonster().name) {
+            if (MonsterManager.Instance?.FindClosestMonster() != null) {
+                var closestMonster = MonsterManager.Instance.FindClosestMonster();
+                if (closestMonster != null &&
+                    __instance?.transform?.parent?.parent?.parent?.name == closestMonster.name) {
+
                     Multiplayer.Instance.enemyAnimationState = stateName;
-                    //ToastManager.Toast(normalizedTime);
-                    //ToastManager.Toast($"same {stateName}");
-                    //Multiplayer.Instance.SendEnemy(__instance.transform.parent.parent.parent.name, stateName, __instance.transform.position);
+
+                    // Uncomment if needed
+                    // ToastManager.Toast(normalizedTime);
+                    // ToastManager.Toast($"same {stateName}");
+                    // Multiplayer.Instance.SendEnemy(__instance.transform.parent.parent.parent.name, stateName, __instance.transform.position);
                 }
             }
+
 
 
             return true; // Allow the original method to execute

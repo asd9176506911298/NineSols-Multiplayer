@@ -970,6 +970,11 @@ namespace Multiplayer {
                                 sprite.color = currentColor;
                             }
 
+                            var hints = enemyData.EnemyObject.GetComponentsInChildren<MultiSpriteEffect>();
+                            foreach (var hint in hints) {
+                                Destroy(hint.gameObject);
+                            }
+
                             Log.Info($"Created new enemy for Player {playerId}: Enemy ID: {enemyID}");
                         }
                     } else {
