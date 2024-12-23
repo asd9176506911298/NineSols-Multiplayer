@@ -989,6 +989,10 @@ namespace Multiplayer {
                             Destroy(enemyData.EnemyObject);
                             enemyDict.Remove(playerId.ToString()); // Remove reference from dictionary
                             continue; // Skip further processing for this enemy
+                        } else {
+                            if (!enemyData.EnemyObject.transform.Find("MonsterCore").gameObject.activeSelf) {
+                                enemyData.EnemyObject.transform.Find("MonsterCore").gameObject.SetActive(true);
+                            }
                         }
 
                         // Check if the enemy's unique ID has changed (indicating a replacement)
