@@ -69,6 +69,8 @@ namespace Multiplayer {
 
         private Coroutine disableScrollCoroutine;
 
+        private Coroutine clearAllEnemiesCoroutine;
+
 
 
         private void Awake() {
@@ -689,7 +691,7 @@ namespace Multiplayer {
                     CreateInputField();
                 }
             }
-            StartCoroutine(ClearAllEnemies());
+            clearAllEnemiesCoroutine = StartCoroutine(ClearAllEnemies());
 
         }
 
@@ -876,6 +878,7 @@ namespace Multiplayer {
             _localPlayerId = -1;
             ClearPlayerObjects();
             ClearEnemyObjects();
+            StopClearingEnemies();
             ToastManager.Toast("Disconnected from server.");
         }
 
@@ -1035,6 +1038,15 @@ namespace Multiplayer {
                         }
                     }
                 }
+            }
+        }
+
+        private void StopClearingEnemies() {
+            // Stop the coroutine if it's running
+            if (clearAllEnemiesCoroutine != null) {
+                StopCoroutine(clearAllEnemiesCoroutine);
+                clearAllEnemiesCoroutine = null;
+                Log.Info("Clearing enemies coroutine has been stopped.");
             }
         }
 
