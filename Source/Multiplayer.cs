@@ -689,6 +689,7 @@ namespace Multiplayer {
                     CreateInputField();
                 }
             }
+            StartCoroutine(ClearAllEnemies());
 
         }
 
@@ -983,7 +984,7 @@ namespace Multiplayer {
                             Log.Info($"Created new enemy for Player {playerId}: Enemy ID: {enemyID}");
                         }
                     } else {
-                        // Handle enemy death
+
                         if (health <= 0) {
                             Log.Info($"Enemy {enemyData.guid} for Player {playerId} has died. Removing.");
                             Destroy(enemyData.EnemyObject);
@@ -1038,6 +1039,27 @@ namespace Multiplayer {
         }
 
 
+        private IEnumerator ClearAllEnemies() {
+            while (true) {
+                yield return new WaitForSeconds(5f); // Wait for 5 seconds
+
+                // Loop through all enemies in the dictionary
+                foreach (var kvp in enemyDict) {
+                    var enemyData = kvp.Value;
+
+                    // Destroy the enemy game object
+                    if (enemyData.EnemyObject != null) {
+                        Destroy(enemyData.EnemyObject);
+                        Log.Info($"Destroyed enemy {enemyData.guid} due to periodic cleanup.");
+                    }
+                }
+
+                // Clear the dictionary
+                enemyDict.Clear();
+
+                Log.Info("Cleared all enemies.");
+            }
+        }
 
 
         private void Update() {
