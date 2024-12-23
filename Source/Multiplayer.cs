@@ -186,6 +186,32 @@ namespace Multiplayer {
         }
 
 #if DEBUG
+        void updateEnemy() {
+            return;
+            Traverse.Create(MonsterManager.Instance).Field("_closetMonster").GetValue<MonsterBase>();
+            // Copy the Animator properties
+            var sourceAnimator = g.GetComponent<Animator>();
+            var targetAnimator = enemy.GetComponent<Animator>();
+
+            if (sourceAnimator != null && targetAnimator != null) {
+                // Synchronize animator parameters
+                SyncAnimator(sourceAnimator, targetAnimator);
+            }
+            
+            if (enemy != null) {
+                var anim = enemy.GetComponent<Animator>();
+                if (anim != null) {
+                    // Get the current animation state information
+                    AnimatorStateInfo currentState = anim.GetCurrentAnimatorStateInfo(0);
+
+                    // Only play the animation if it's not already playing
+                    if (!currentState.IsName("Attack1")) {
+                        anim.PlayInFixedTime("Attack1", 0, 0f);
+                    }
+                }
+            }
+        }
+
         void test3() {
             testbool = !testbool;
         }
@@ -896,31 +922,7 @@ namespace Multiplayer {
             _playerObjects.Clear();
         }
 
-        void updateEnemy() {
-            return;
-            Traverse.Create(MonsterManager.Instance).Field("_closetMonster").GetValue<MonsterBase>();
-            // Copy the Animator properties
-            var sourceAnimator = g.GetComponent<Animator>();
-            var targetAnimator = enemy.GetComponent<Animator>();
-
-            if (sourceAnimator != null && targetAnimator != null) {
-                // Synchronize animator parameters
-                SyncAnimator(sourceAnimator, targetAnimator);
-            }
-            
-            if (enemy != null) {
-                var anim = enemy.GetComponent<Animator>();
-                if (anim != null) {
-                    // Get the current animation state information
-                    AnimatorStateInfo currentState = anim.GetCurrentAnimatorStateInfo(0);
-
-                    // Only play the animation if it's not already playing
-                    if (!currentState.IsName("Attack1")) {
-                        anim.PlayInFixedTime("Attack1", 0, 0f);
-                    }
-                }
-            }
-        }
+        
 
         public void SendEnemy(string uniqueID, float health, Vector3 pos,bool isFacingRight) {
             if (_client.IsRunning && _client.FirstPeer?.ConnectionState == ConnectionState.Connected) {
@@ -1090,8 +1092,6 @@ namespace Multiplayer {
             }
 
             _client.PollEvents();
-
-            updateEnemy();
 
             // Ensure inputField is not null before accessing
             if (inputField != null) {
