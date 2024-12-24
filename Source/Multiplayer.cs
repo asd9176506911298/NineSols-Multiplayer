@@ -629,10 +629,12 @@ namespace Multiplayer {
                 StartCoroutine(WaitAndClearPlayerObjects(scene));
             }
 
-            _dataWriter.Reset();
-            _dataWriter.Put("Scene");
-            _dataWriter.Put(SceneManager.GetActiveScene().name);
-            _client.FirstPeer.Send(_dataWriter, DeliveryMethod.ReliableOrdered);
+            if (_client.FirstPeer?.ConnectionState == ConnectionState.Connected) {
+                _dataWriter.Reset();
+                _dataWriter.Put("Scene");
+                _dataWriter.Put(SceneManager.GetActiveScene().name);
+                _client.FirstPeer.Send(_dataWriter, DeliveryMethod.ReliableOrdered);
+            }
         }
 
         private IEnumerator WaitAndClearPlayerObjects(Scene scene) {
