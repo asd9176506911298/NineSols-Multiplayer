@@ -3,6 +3,7 @@
 # Feature
 - Attack Other Player
 - Enable Display Player Name and adjust Name size
+- Toggle Enemy Display and Adjust Color include transparency
 - Press Enter Chat
 
 # Step
@@ -14,6 +15,7 @@
 - Download zip unzip Server.exe run it
 - use LAN is straightforward or playing over the internet requires some extra work
 - hosted game should be forwarded in your router to point to the device you are hosting on. Alternatively, you could use software to facilitate extending your LAN, such as Hamachi.
+- Port is 9050
 
 # Server Command
 - say text // say hello
