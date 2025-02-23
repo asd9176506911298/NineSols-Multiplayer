@@ -1,158 +1,1923 @@
-﻿using BepInEx;
+﻿
+using Auto.Utils;
+using BepInEx;
 using BepInEx.Configuration;
+using Dialogue;
 using HarmonyLib;
+using LiteNetLib;
+using LiteNetLib.Utils;
 using NineSolsAPI;
-using UnityEngine;
-using System.Net;
-using System.Net.Sockets;
-using System.Threading;
-using System.Text;
 using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using TMPro;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+using static UnityEngine.UIElements.StylePropertyAnimationSystem;
 
 namespace Multiplayer {
     [BepInDependency(NineSolsAPICore.PluginGUID)]
     [BepInPlugin(PluginInfo.PLUGIN_GUID, PluginInfo.PLUGIN_NAME, PluginInfo.PLUGIN_VERSION)]
     public class Multiplayer : BaseUnityPlugin {
-        private ConfigEntry<bool> enableServerConfig = null!;
-        private ConfigEntry<int> serverPortConfig = null!;
-        private ConfigEntry<KeyboardShortcut> startServerShortcut = null!;
-        private ConfigEntry<KeyboardShortcut> joinServerShortcut = null!; // Add this shortcut for joining server
+        public static Multiplayer Instance { get; private set; }
 
-        private Harmony harmony = null!;
+        private Harmony _harmony;
+        private NetManager _client;
+        private NetDataWriter _dataWriter;
+        private EventBasedNetListener _listener;
 
-        private TcpListener? serverListener;
-        private Thread? serverThread;
-        private TcpClient? client;
-        private NetworkStream? stream;
-        private Thread? clientThread;
+        private ConfigEntry<string> ip;
+        private ConfigEntry<int> port;
+        private ConfigEntry<bool> join;
+        private ConfigEntry<bool> leave;
+        private ConfigEntry<string> pvp;
+        private ConfigEntry<string> playerName;
+        private ConfigEntry<bool> displayPlayerName;
+        private ConfigEntry<int> playerNameSize;
+        public bool isPVP;
+
+        private float timeStarted = 0f;  // Time when Enter key was pressed
+        private float timeLimit = 0.1f;    // Time after which the input field should be hidden
+        private bool isTimerRunning = false; // Flag to track whether the timer is running
+
+        public bool isTexting = false;
+
+        bool testbool = false;
+
+        GameObject minionPrefab = null;
+
+        public readonly Dictionary<int, PlayerData> _playerObjects = new();
+        private Dictionary<string, EnemyData> enemyDict = new Dictionary<string, EnemyData>(); // Track enemies by unique ID
+
+
+
+        private int _localPlayerId = -1;
+        private const float SendInterval = 0.02f;
+        private float _sendTimer;
+
+        private string? currentAnimationState = string.Empty;
+        public string? localAnimationState = "";
+        public string? enemyAnimationState = "";
+
+        private GameObject chatCanvas;
+        private GameObject inputField;
+        private GameObject chatLog;
+        private GameObject scrollView;
+
+        private Coroutine disableScrollCoroutine;
+
+        private Coroutine clearAllEnemiesCoroutine;
+
+
 
         private void Awake() {
+            Instance = this;
             Log.Init(Logger);
-            RCGLifeCycle.DontDestroyForever(gameObject);
+            try {
+                RCGLifeCycle.DontDestroyForever(gameObject);
 
-            harmony = Harmony.CreateAndPatchAll(typeof(Multiplayer).Assembly);
+                _harmony = Harmony.CreateAndPatchAll(typeof(Multiplayer).Assembly);
+                InitializeNetworking();
 
-            enableServerConfig = Config.Bind("Server", "EnableServer", true, "Enable the server to host multiplayer.");
-            serverPortConfig = Config.Bind("Server", "ServerPort", 7777, "Port number for the server to listen on.");
-            startServerShortcut = Config.Bind("Server", "StartServerShortcut",
-                new KeyboardShortcut(KeyCode.H, KeyCode.LeftControl), "Shortcut to start the server");
-            joinServerShortcut = Config.Bind("Client", "JoinServerShortcut",
-                new KeyboardShortcut(KeyCode.J, KeyCode.LeftControl), "Shortcut to join the server");
+                //titlescreenModifications.Load();
 
-            KeybindManager.Add(this, StartServer, () => startServerShortcut.Value);
-            KeybindManager.Add(this, StartClient, () => joinServerShortcut.Value);
+                ip = Config.Bind("", "Server Ip", "yukikaco.ddns.net", "");
+                port = Config.Bind("", "Server Port", 9050, "");
+                join = Config.Bind("", "Join Server Button", false, "");
+                leave = Config.Bind("", "Leave Server Button", false, "");
+                pvp = Config.Bind("", "Server PVP State", "", "");
+                playerName = Config.Bind("Name", "Your Player Name", "", "");
+                displayPlayerName = Config.Bind("Name", "Is Display Player Name", true, "");
+                playerNameSize = Config.Bind("Name", "Player Name Size", 200, "");
 
-            Logger.LogInfo($"Plugin {PluginInfo.PLUGIN_GUID} is loaded!");
+#if DEBUG
+                KeybindManager.Add(this, ConnectToServer, () => new KeyboardShortcut(KeyCode.S,KeyCode.LeftControl));
+                KeybindManager.Add(this, DisconnectFromServer, () => new KeyboardShortcut(KeyCode.Q,KeyCode.LeftControl));
+                KeybindManager.Add(this, StartMemoryChallenge, () => new KeyboardShortcut(KeyCode.Z));
+                KeybindManager.Add(this, test, () => new KeyboardShortcut(KeyCode.H, KeyCode.LeftControl));
+                KeybindManager.Add(this, test2, () => new KeyboardShortcut(KeyCode.X, KeyCode.LeftControl));
+                KeybindManager.Add(this, test3, () => new KeyboardShortcut(KeyCode.P, KeyCode.LeftControl));
+                ip.Value = "127.0.0.1";
+#endif
+
+                join.SettingChanged += (_, _) => { if (join.Value) ConnectToServer(); join.Value = false; };
+                leave.SettingChanged += (_, _) => { if (leave.Value) DisconnectFromServer(); leave.Value = false; };
+                displayPlayerName.SettingChanged += (_, _) =>  SetPlayerNameVisible();
+                playerNameSize.SettingChanged += (_, _) => SetPlayerNameSize();
+
+                SceneManager.sceneLoaded += OnSceneLoaded;
+            } catch (Exception e) {
+                Log.Error($"Failed to initialized modding API: {e}");
+            }
+
+            Log.Info("Multiplayer plugin initialized.");
+
+            //CreateChatCanvas();
+
+            //// Create Chat Log (Scroll View)
+            //CreateChatLog();
+
+            //// Create Input Field
+            //CreateInputField();
+
+            // Make chat window initially hidden
+            //chatCanvas.SetActive(false);
         }
 
-        private void StartServer() {
-            if (enableServerConfig.Value) {
-                if (serverListener == null || !serverListener.Server.IsBound) {
-                    StartHostingServer();
-                    ToastManager.Toast("Server started.");
+        void CreateChatCanvas() {
+            chatCanvas = new GameObject("ChatCanvas");
+            var canvas = chatCanvas.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+
+            // Add CanvasScaler and GraphicRaycaster for proper UI functionality
+            chatCanvas.AddComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            chatCanvas.AddComponent<GraphicRaycaster>();
+
+            var rect = chatCanvas.GetComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(400, 300); // Set your desired size
+            rect.anchorMin = new Vector2(0, 0); // Anchor to bottom-left
+            rect.anchorMax = new Vector2(0, 0); // Anchor to bottom-left
+            rect.pivot = new Vector2(0, 0); // Set pivot to bottom-left corner
+            rect.anchoredPosition = new Vector2(0, 0); // Set position to (0, 0) relativ
+
+            RCGLifeCycle.DontDestroyForever(chatCanvas);
+        }
+
+        void SetPlayerNameSize() {
+            // Cache the player name size value
+            float fontSize = playerNameSize.Value;
+
+            // Iterate over the values directly if keys are not needed
+            foreach (var player in _playerObjects.Values) {
+                // Attempt to find the "PlayerName" GameObject
+                var playerNameTransform = player.PlayerObject.transform.Find("PlayerName");
+
+                if (playerNameTransform != null) {
+                    // Get the TextMeshPro component
+                    var textMeshPro = playerNameTransform.GetComponent<TextMeshPro>();
+
+                    if (textMeshPro != null) {
+                        // Set the font size
+                        textMeshPro.fontSize = fontSize;
+                    } else {
+                        // Optional: Log a warning if TextMeshPro is missing
+                        Log.Warning($"TextMeshPro component not found in {player.PlayerObject.name}'s PlayerName.");
+                    }
                 } else {
-                    ToastManager.Toast("Server is already running.");
+                    // Optional: Log a warning if "PlayerName" GameObject is missing
+                    Log.Warning($"PlayerName GameObject not found in {player.PlayerObject.name}");
+                }
+            }
+        }
+
+
+        private void SetPlayerNameVisible() {
+            bool isVisible = displayPlayerName.Value;
+
+            foreach (var player in _playerObjects.Values) {
+                var playerNameObject = player.PlayerObject.transform.Find("PlayerName")?.gameObject;
+                if (playerNameObject != null) {
+                    playerNameObject.SetActive(isVisible);
+                }
+            }
+        }
+
+#if DEBUG
+        void updateEnemy() {
+            return;
+            Traverse.Create(MonsterManager.Instance).Field("_closetMonster").GetValue<MonsterBase>();
+            // Copy the Animator properties
+            var sourceAnimator = g.GetComponent<Animator>();
+            var targetAnimator = enemy.GetComponent<Animator>();
+
+            if (sourceAnimator != null && targetAnimator != null) {
+                // Synchronize animator parameters
+                SyncAnimator(sourceAnimator, targetAnimator);
+            }
+            
+            if (enemy != null) {
+                var anim = enemy.GetComponent<Animator>();
+                if (anim != null) {
+                    // Get the current animation state information
+                    AnimatorStateInfo currentState = anim.GetCurrentAnimatorStateInfo(0);
+
+                    // Only play the animation if it's not already playing
+                    if (!currentState.IsName("Attack1")) {
+                        anim.PlayInFixedTime("Attack1", 0, 0f);
+                    }
+                }
+            }
+        }
+
+        void test3() {
+            testbool = !testbool;
+        }
+
+        private IEnumerator PreloadSceneObjects(string sceneName, string objectPath) {
+            // Load the scene asynchronously in the background.
+            AsyncOperation asyncLoad = SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Additive);
+
+            // Wait until the scene is fully loaded.
+            while (!asyncLoad.isDone) {
+                yield return null;
+            }
+
+            // Scene is now loaded, find the target object.
+            Scene loadedScene = SceneManager.GetSceneByName(sceneName);
+            GameObject targetObject = null;
+
+            if (loadedScene.IsValid()) {
+                // Temporarily activate the loaded scene.
+                SceneManager.SetActiveScene(loadedScene);
+
+                // Find the target GameObject.
+                targetObject = GameObject.Find(objectPath);
+
+                if (targetObject != null) {
+                    // Detach the object to make it a root GameObject.
+                    //targetObject.SetActive(true);
+                    //targetObject.transform.SetParent(null);
+
+                    // Ensure it's now a root object before making it persistent.
+                    if (targetObject.transform.parent == null) {
+                        //horse
+                        //Vector3 v = new Vector3(targetObject.transform.position.x, targetObject.transform.position.y + 100f, targetObject.transform.position.z);
+                        //Vector3 v = new Vector3(targetObject.transform.position.x, targetObject.transform.position.y - 500f, targetObject.transform.position.z);
+                        //Vector3 v = new Vector3(targetObject.transform.position.x + 100f, targetObject.transform.position.y + 95f, targetObject.transform.position.z);
+                        Vector3 v = new Vector3(targetObject.transform.position.x + 100f, targetObject.transform.position.y - 500f, targetObject.transform.position.z);
+                        targetObject.transform.position = v;
+                        ToastManager.Toast(GetGameObjectPath(targetObject.gameObject));
+                        RCGLifeCycle.DontDestroyForever(targetObject);
+                        //var levelAwakeList = targetObject.GetComponentsInChildren<ILevelAwake>(true);
+                        //for (var i = levelAwakeList.Length - 1; i >= 0; i--) {
+                        //    var context = levelAwakeList[i];
+                        //    try { context.EnterLevelAwake(); } catch (Exception ex) { Log.Error(ex.StackTrace); }
+                        //}
+                        Log.Info($"Found and persisted GameObject: {targetObject.name}");
+                    } else {
+                        Log.Warning($"Failed to detach GameObject: {targetObject.name}");
+                    }
+                } else {
+                    Log.Warning($"GameObject with path '{objectPath}' not found in scene '{sceneName}'.");
                 }
             } else {
-                ToastManager.Toast("Server is disabled in the configuration.");
+                Log.Warning($"Scene '{sceneName}' is not valid or failed to load.");
             }
+
+            // Unload the scene.
+            SceneManager.UnloadSceneAsync(sceneName);
+
+            Log.Info("Scene unloaded and active scene reverted.");
+
+            // Reload the current scene to reset the state if needed.
+            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
         }
 
-        private void StartHostingServer() {
-            serverThread = new Thread(() => HostServer(serverPortConfig.Value));
-            serverThread.Start();
-        }
+        GameObject enemy = null;
+        GameObject g = null;
 
-        private void HostServer(int port) {
-            try {
-                serverListener = new TcpListener(IPAddress.Any, port);
-                serverListener.Start();
-                Logger.LogInfo($"Server is hosting on port {port}.");
+        void SyncAnimator(Animator sourceAnimator, Animator targetAnimator) {
+            // Copy parameters from sourceAnimator to targetAnimator
+            for (int i = 0; i < sourceAnimator.parameterCount; i++) {
+                var param = sourceAnimator.parameters[i];
 
-                while (true) {
-                    TcpClient client = serverListener.AcceptTcpClient();
-                    Logger.LogInfo($"New client connected: {client.Client.RemoteEndPoint}");
-                    ThreadPool.QueueUserWorkItem(HandleClient, client);
-                }
-            } catch (Exception ex) {
-                Logger.LogError($"Error hosting server: {ex.Message}");
-            }
-        }
-
-        private void HandleClient(object obj) {
-            TcpClient client = (TcpClient)obj;
-            NetworkStream stream = client.GetStream();
-            byte[] buffer = new byte[1024];
-
-            try {
-                while (true) {
-                    if (stream.DataAvailable) {
-                        int bytesRead = stream.Read(buffer, 0, buffer.Length);
-                        if (bytesRead > 0) {
-                            string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                            Logger.LogInfo($"Received message from client: {message}");
-
-                            byte[] response = Encoding.UTF8.GetBytes("Message received");
-                            stream.Write(response, 0, response.Length);
+                switch (param.type) {
+                    case AnimatorControllerParameterType.Bool:
+                        targetAnimator.SetBool(param.name, sourceAnimator.GetBool(param.name));
+                        break;
+                    case AnimatorControllerParameterType.Float:
+                        targetAnimator.SetFloat(param.name, sourceAnimator.GetFloat(param.name));
+                        break;
+                    case AnimatorControllerParameterType.Int:
+                        targetAnimator.SetInteger(param.name, sourceAnimator.GetInteger(param.name));
+                        break;
+                    case AnimatorControllerParameterType.Trigger:
+                        if (sourceAnimator.GetBool(param.name)) {
+                            targetAnimator.SetTrigger(param.name);
                         }
-                    }
-                    Thread.Sleep(50);
+                        break;
                 }
-            } catch (Exception ex) {
-                Logger.LogError($"Error handling client: {ex.Message}");
-            } finally {
-                client.Close();
-                Logger.LogInfo("Client disconnected.");
+            }
+
+            // Optionally play the current state of the source animator
+            AnimatorStateInfo sourceState = sourceAnimator.GetCurrentAnimatorStateInfo(0);
+            targetAnimator.Play(sourceState.fullPathHash, 0, sourceState.normalizedTime);
+        }
+
+        void test2() {
+            // Array of player object names
+            ToastManager.Toast(":goodtimefrog: Za Warudo");
+
+            // Locate the original Animator GameObject
+            //g = GameObject.Find("A1_S2_GameLevel/Room/Prefab/Gameplay5/EventBinder/LootProvider/General Boss Fight FSM ObjectA1_S2_大劍兵/FSM Animator/LogicRoot/---Boss---/BossShowHealthArea/StealthGameMonster_Samurai_General_Boss Variant/MonsterCore/Animator(Proxy)/Animator");
+            g = MonsterManager.Instance.FindClosestMonster().transform.Find("MonsterCore/Animator(Proxy)/Animator").gameObject;
+
+            // Get the position of the player and offset the new enemy's position
+            var p = Player.i.transform.position;
+            var pos = new Vector3(p.x, p.y + 40f, p.z);
+
+            // Instantiate the enemy if not already created
+            if (enemy == null)
+                enemy = Instantiate(g, pos, Quaternion.identity);
+
+            var sprites = enemy.GetComponentsInChildren<SpriteRenderer>();
+            foreach(var x in sprites) {
+                Color currentColor = x.color;
+                currentColor.a = 0.5f;
+                x.color = currentColor;
+            }
+
+            //// Copy the Animator properties
+            //var sourceAnimator = g.GetComponent<Animator>();
+            //var targetAnimator = enemy.GetComponent<Animator>();
+
+            //if (sourceAnimator != null && targetAnimator != null) {
+            //    // Synchronize animator parameters
+            //    SyncAnimator(sourceAnimator, targetAnimator);
+            //}
+
+            //var sp = GameObject.Find("GameCore(Clone)/RCG LifeCycle/PPlayer/RotateProxy/SpriteHolder/customObject").GetComponent<SpriteRenderer>().sprite;
+            ////ToastManager.Toast(sp);
+
+            //foreach (var x in GameObject.Find("A1_S2_GameLevel").GetComponentsInChildren<SpriteRenderer>()) {
+            //    foreach (var a in x.GetComponentsInChildren<Animator>())
+            //        a.enabled = false;
+
+            //    foreach (var s in x.GetComponentsInChildren<SpriteRenderer>()) {
+            //        s.sprite = sp;
+
+            //        // Scale up the sprite if necessary
+            //        float scaleFactor = 3.0f; // Adjust this value as needed
+            //        s.transform.localScale = new Vector3(scaleFactor, scaleFactor, 1);
+            //    }
+            //}
+
+            //foreach (var x in GameObject.FindObjectsOfType<MonsterBase>()) {
+            //    foreach (var a in x.GetComponentsInChildren<Animator>())
+            //        a.enabled = false;
+
+            //    foreach (var s in x.GetComponentsInChildren<SpriteRenderer>()) {
+            //        s.sprite = sp;
+
+            //        // Scale up the sprite if necessary
+            //        float scaleFactor = 5.0f; // Adjust this value as needed
+            //        s.transform.localScale = new Vector3(scaleFactor, scaleFactor, 1);
+            //    }
+            //}
+
+            //foreach(Transform x in GameObject.Find("GameCore(Clone)/RCG LifeCycle/PPlayer/RotateProxy/SpriteHolder/HitBoxManager").transform) {
+            //    foreach(var z in x.GetComponentsInChildren<EffectDealer>()) {
+            //        ToastManager.Toast(z.name);
+            //    }
+            //}
+            //GameCore.Instance.GoToSceneWithSavePoint("VR_Challenge_Boss_SpearHorseman");
+            //foreach(var x in _playerObjects) {
+            //    x.Value.PlayerObject.transform.Find("PlayerName").gameObject.SetActive(false);
+            //}
+            //SceneManager.LoadScene("VR_Challenge_Hub");
+            //if(minionPrefab == null && Player.i != null)
+            //    StartCoroutine(Test2Coroutine());
+            //else {
+            //    ToastManager.Toast("ddddddddnull");
+            //}
+            //foreach (var obj in Resources.FindObjectsOfTypeAll<MonsterBase>()) {
+            //    if (obj.name == "StealthGameMonster_Minion_prefab")
+            //        ToastManager.Toast("StealthGameMonster_Minion_prefab");
+            //}
+            //// Find the object in memory
+            //GameObject minionPrefab = null;
+            //var allObjects = Resources.FindObjectsOfTypeAll<GameObject>();
+            //foreach (var obj in allObjects) {
+            //    if (obj.name == "StealthGameMonster_Minion_prefab") {
+            //        minionPrefab = obj;
+            //        AutoAttributeManager.AutoReference(obj);
+            //        AutoAttributeManager.AutoReferenceAllChildren(obj);
+            //        break;
+            //    }
+            //}
+
+            //if (minionPrefab != null) {
+            //    ToastManager.Toast("Found object: " + minionPrefab.name);
+            //    // Do something with the object
+            //} else {
+            //    ToastManager.Toast("Object not found.");
+            //}
+
+            //var copy = Instantiate(minionPrefab);
+            //AutoAttributeManager.AutoReference(copy);
+            //AutoAttributeManager.AutoReferenceAllChildren(copy);
+
+            //var levelAwakeList = copy.GetComponentsInChildren<ILevelAwake>(true);
+            //for (var i = levelAwakeList.Length - 1; i >= 0; i--) {
+            //    var context = levelAwakeList[i];
+            //    try { context.EnterLevelAwake(); } catch (Exception ex) { Log.Error(ex.StackTrace); }
+            //}
+
+            //copy.transform.position = Player.i.transform.position;
+
+
+            //StartCoroutine(PreloadSceneObjects("A2_S5_BossHorseman_Final", "A2_S5_ BossHorseman_GameLevel"));
+            //StartCoroutine(PreloadSceneObjects("A3_S5_BossGouMang_Final", "A3_S5_BossGouMang_GameLevel"));
+            //StartCoroutine(PreloadSceneObjects("A11_S0_Boss_YiGung", "GameLevel"));
+            //ToastManager.Toast(GameObject.Find("Room/StealthGameMonster_SpearHorseMan"));
+            //var copy = GameObject.Find("Room");
+            //AutoAttributeManager.AutoReference(copy);
+            //AutoAttributeManager.AutoReferenceAllChildren(copy);
+
+            //var levelAwakeList = copy.GetComponentsInChildren<ILevelAwake>(true);
+            //for (var i = levelAwakeList.Length - 1; i >= 0; i--) {
+            //    var context = levelAwakeList[i];
+            //    try { context.EnterLevelAwake(); } catch (Exception ex) { Log.Error(ex.StackTrace); }
+            //}
+
+            //foreach (var gameObject in Resources.FindObjectsOfTypeAll<GameObject>()) {
+            //    var monsterBases = gameObject.GetComponentsInChildren<DamageDealer>(true);
+            //    foreach (var monster in monsterBases) {
+            //        ToastManager.Toast(GetGameObjectPath(monster.gameObject));
+            //    }
+            //}
+
+
+            //ToastManager.Toast(Player.i.transform.Find("RotateProxy/SpriteHolder/HitBoxManager"));
+            //var x = Player.i.transform.Find("RotateProxy/SpriteHolder/HitBoxManager").transform;
+            //for(int i = 0; i < x.childCount; i++) {
+            //    ToastManager.Toast(x.GetChild(i).name);
+            //}
+            //GameObject.Find("PlayerObject_0/RotateProxy/SpriteHolder").transform.SetParent(null);
+            //Destroy(GameObject.Find("PlayerObject_0"));
+            //string[] playerObjectNames = { "PlayerObject_0", "PlayerObject_1", "PlayerObject_2", "PlayerObject_3" };
+
+            //// Loop through each player object
+            //foreach (string playerName in playerObjectNames) {
+            //    GameObject playerObject = GameObject.Find(playerName);
+            //    if (playerObject != null) {
+            //        Animator animator = playerObject.GetComponent<Animator>();
+            //        if (animator != null) {
+            //            animator.PlayInFixedTime("Attack1", 0, 0f);
+            //        }
+            //    }
+            //}
+
+        }
+        void test() {
+            ToastManager.Toast("test");
+
+            var effectReceiver = Player.i.transform
+                        .Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")
+                        .GetComponent<EffectReceiver>();
+
+            ToastManager.Toast(effectReceiver);
+            if (effectReceiver != null) {
+                effectReceiver.effectType = EffectType.EnemyAttack |
+                                            EffectType.BreakableBreaker |
+                                            EffectType.ShieldBreak |
+                                            EffectType.PostureDecreaseEffect;
+            }
+
+            var p = Player.i.gameObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.AddComponent<DamageDealer>();
+            p.type = DamageType.MonsterAttack;
+            Traverse.Create(p).Field("_parriableOwner").SetValue(MonsterManager.Instance.monsterDict.First().Value);
+            p.bindingParry = MonsterManager.Instance.monsterDict.First().Value.GetComponentInChildren<ParriableAttackEffect>();
+            p.attacker = Player.i.health;
+            p.damageAmount = Player.i.gameObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>().FinalValue;
+
+            Traverse.Create(Player.i.gameObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("valueProvider").SetValue(p);
+            Traverse.Create(Player.i.gameObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("fxTimingOverrider").SetValue(p);
+
+            var c = Traverse.Create(Player.i.gameObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("customDealers");
+            var n = new List<DamageDealer> { p };
+            // Set the new array back to the customDealers field.
+            c.SetValue(n.ToArray());
+
+            var dummy = Instantiate(
+                Player.i.transform.Find("RotateProxy/SpriteHolder").gameObject,
+                Player.i.transform.position,
+                Quaternion.identity
+            );
+
+            var pp = dummy.transform.Find("HitBoxManager/AttackFront").gameObject.AddComponent<DamageDealer>();
+            pp.type = DamageType.MonsterAttack;
+            Traverse.Create(pp).Field("_parriableOwner").SetValue(MonsterManager.Instance.monsterDict.First().Value);
+            pp.bindingParry = MonsterManager.Instance.monsterDict.First().Value.GetComponentInChildren<ParriableAttackEffect>();
+            pp.attacker = MonsterManager.Instance.monsterDict.First().Value.health;
+            pp.damageAmount = dummy.transform.Find("HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>().FinalValue;
+
+            Traverse.Create(dummy.transform.Find("HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("valueProvider").SetValue(p);
+            Traverse.Create(dummy.transform.Find("HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("fxTimingOverrider").SetValue(p);
+
+            var cc = Traverse.Create(dummy.transform.Find("HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("customDealers");
+            var nn = new List<DamageDealer> { pp };
+            cc.SetValue(nn.ToArray());
+
+            var e = dummy.transform
+                        .Find("Health(Don'tKey)/DamageReceiver")
+                        .GetComponent<EffectReceiver>();
+
+            ToastManager.Toast(e);
+            if (e != null) {
+                e.effectType = EffectType.EnemyAttack |
+                                            EffectType.BreakableBreaker |
+                                            EffectType.ShieldBreak |
+                                            EffectType.PostureDecreaseEffect;
+            }
+
+            AutoAttributeManager.AutoReference(dummy);
+            AutoAttributeManager.AutoReferenceAllChildren(dummy);
+            //Player.i.Suicide();
+            //var x = Instantiate(Resources.Load<GameObject>("Global Prefabs/GameCore").transform.Find("RCG LifeCycle"));
+            //x.transform.Find("PPlayer").transform.position = Player.i.transform.position;
+
+            //var effectReceiver = Player.i.transform
+            //            .Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")
+            //            .GetComponent<EffectReceiver>();
+
+            //ToastManager.Toast(effectReceiver);
+            //if (effectReceiver != null) {
+            //    effectReceiver.effectType = EffectType.EnemyAttack |
+            //                                EffectType.BreakableBreaker |
+            //                                EffectType.ShieldBreak |
+            //                                EffectType.PostureDecreaseEffect;
+            //}
+
+            //AutoAttributeManager.AutoReference(x.gameObject);
+            //AutoAttributeManager.AutoReferenceAllChildren(x.gameObject);
+
+            //var d = x.transform.Find("PPlayer/RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.AddComponent<DamageDealer>();
+            //Traverse.Create(d).Field("_parriableOwner").SetValue(MonsterManager.Instance.monsterDict.First().Value);
+            //d.type = DamageType.MonsterAttack;
+            //Traverse.Create(d).Field("_parriableOwner").SetValue(MonsterManager.Instance.monsterDict.First().Value);
+            //d.bindingParry = MonsterManager.Instance.monsterDict.First().Value.GetComponentInChildren<ParriableAttackEffect>();
+            ////d.attacker = x.transform.Find("PPlayer").GetComponent<Player>().health;
+            //d.attacker = MonsterManager.Instance.monsterDict.First().Value.GetComponentInChildren<Health>();
+            //d.damageAmount = x.transform.Find("PPlayer/RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>().FinalValue;
+
+            //Traverse.Create(x.transform.Find("PPlayer/RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("valueProvider").SetValue(d);
+            //Traverse.Create(x.transform.Find("PPlayer/RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("fxTimingOverrider").SetValue(d);
+
+            //var customDealersField = Traverse.Create(x.transform.Find("PPlayer/RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("customDealers");
+            //var newDealersArray = new List<DamageDealer> { d };
+            //// Set the new array back to the customDealers field.
+            //customDealersField.SetValue(newDealersArray.ToArray());
+
+            //effectReceiver = x.transform
+            //            .Find("PPlayer/RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")
+            //            .GetComponent<EffectReceiver>();
+
+            //if (effectReceiver != null) {
+            //    effectReceiver.effectType = EffectType.EnemyAttack |
+            //                                EffectType.BreakableBreaker |
+            //                                EffectType.ShieldBreak |
+            //                                EffectType.PostureDecreaseEffect;
+            //}
+
+            //var p = Player.i.gameObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.AddComponent<DamageDealer>();
+            //Traverse.Create(p).Field("_parriableOwner").SetValue(MonsterManager.Instance.monsterDict.First().Value);
+            //p.type = DamageType.MonsterAttack;
+            //Traverse.Create(p).Field("_parriableOwner").SetValue(MonsterManager.Instance.monsterDict.First().Value);
+            //p.bindingParry = MonsterManager.Instance.monsterDict.First().Value.GetComponentInChildren<ParriableAttackEffect>();
+            //p.attacker = Player.i.health;
+            //p.damageAmount = Player.i.gameObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>().FinalValue;
+
+            //Traverse.Create(Player.i.gameObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("valueProvider").SetValue(p);
+            //Traverse.Create(Player.i.gameObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("fxTimingOverrider").SetValue(p);
+
+            //var c = Traverse.Create(Player.i.gameObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("customDealers");
+            //var n = new List<DamageDealer> { p };
+            //// Set the new array back to the customDealers field.
+            //c.SetValue(n.ToArray());
+
+            //if (SceneManager.GetActiveScene().name == "TitleScreenMenu" && StartMenuLogic.Instance != null) {
+
+            //    var StartMemoryChallenge = typeof(StartMenuLogic).GetMethod("StartMemoryChallenge");
+            //    if (StartMemoryChallenge != null)
+            //        StartMemoryChallenge.Invoke(StartMenuLogic.Instance, new object[] { });
+            //}
+
+            //foreach(var x in Resources.FindObjectsOfTypeAll<ParriableAttackEffect>()) {
+            //    ToastManager.Toast(GetGameObjectPath(x.gameObject));
+            //}
+            //var x = Instantiate(Resources.Load<GameObject>("Global Prefabs/GameCore").GetComponent<GameCore>().transform.Find("RCG LifeCycle").gameObject, Player.i.transform.position, Quaternion.identity);
+            //Player.i.ChangeState(PlayerStateType.Parry);
+        }
+
+        void StartMemoryChallenge() {
+            if (SceneManager.GetActiveScene().name == "TitleScreenMenu" && StartMenuLogic.Instance != null) {
+                ToastManager.Toast("StartMemoryChallenge");
+                var StartMemoryChallenge = typeof(StartMenuLogic).GetMethod("StartMemoryChallenge");
+                if (StartMemoryChallenge != null)
+                    StartMemoryChallenge.Invoke(StartMenuLogic.Instance, new object[] { });
             }
         }
 
-        private void StartClient() {
-            try {
-                if (client != null && client.Connected) {
-                    Logger.LogInfo("Already connected to the server.");
+#endif
+
+        private void InitializeNetworking() {
+            _listener = new EventBasedNetListener();
+            _client = new NetManager(_listener) { AutoRecycle = true };
+            _dataWriter = new NetDataWriter();
+
+            _listener.NetworkReceiveEvent += OnNetworkReceiveEvent;
+            _listener.PeerDisconnectedEvent += OnPeerDisconnectedEvent;
+        }
+
+        private void OnSceneLoaded(Scene scene, LoadSceneMode mode) {
+            if (_client.FirstPeer != null) {
+                // Start a coroutine to wait for 3 seconds before clearing player objects
+                StartCoroutine(WaitAndClearPlayerObjects(scene));
+            }
+
+            if (_client.FirstPeer?.ConnectionState == ConnectionState.Connected) {
+                _dataWriter.Reset();
+                _dataWriter.Put("Scene");
+                _dataWriter.Put(SceneManager.GetActiveScene().name);
+                _client.FirstPeer.Send(_dataWriter, DeliveryMethod.ReliableOrdered);
+            }
+        }
+
+        private IEnumerator WaitAndClearPlayerObjects(Scene scene) {
+            // Wait for 3 seconds first
+            
+
+            // Wait until the game state is 'Playing'
+            while (GameCore.Instance.currentCoreState != GameCore.GameCoreState.Playing) {
+                //ToastManager.Toast(GameCore.Instance.currentCoreState);
+                yield return new WaitForSeconds(0.3f); // Wait for the next frame before rechecking
+                //ToastManager.Toast("123");
+            }
+
+            while (Player.i.playerInput.currentStateType != PlayerInputStateType.Action) {
+                //ToastManager.Toast(GameCore.Instance.currentCoreState);
+                yield return new WaitForSeconds(0.3f); // Wait for the next frame before rechecking
+                //ToastManager.Toast("456");
+            }
+
+            //yield return new WaitForSeconds(2f);
+
+            // Execute the logic once the condition is met
+            ClearPlayerObjects();
+        }
+
+
+        private void ConnectToServer() {
+            if (_client.IsRunning) return;
+
+            if (Player.i == null) {
+                ToastManager.Toast("Yi haven't create. Enter game try join server again");
+                return;
+            }
+
+            ToastManager.Toast("Connecting to server...");
+            _client.Start();
+            _client.Connect(ip.Value, port.Value, "SomeConnectionKey");
+            _localPlayerId = -1;
+            ClearPlayerObjects();
+
+            // Start a coroutine to check the connection status
+            StartCoroutine(CheckConnectionStatus(OnConnectionStatusChecked));
+
+            // Check if the chatCanvas already exists, if not, create it
+            if (chatCanvas == null) {
+                foreach (var chat in Resources.FindObjectsOfTypeAll<Canvas>()) {
+                    if (chat.name == "ChatCanvas (RCGLifeCycle)") {
+                        chatCanvas = chat.gameObject;
+                        //ToastManager.Toast(chat.name); // Log the found canvas
+                    }
+                }
+                // Create Chat Canvas if it doesn't exist
+                if (chatCanvas == null) {
+                    CreateChatCanvas();
+                }
+            }
+
+            // Check if the scrollView already exists, if not, create it
+            if (scrollView == null) {
+                foreach (var log in Resources.FindObjectsOfTypeAll<ScrollRect>()) {
+                    if (log.transform.parent.name == "ChatCanvas (RCGLifeCycle)") {
+                        scrollView = log.gameObject;
+                        ToastManager.Toast(log.name); // Log the found ScrollView
+                    }
+                }
+                // Create Chat Log (Scroll View) if it doesn't exist
+                if (scrollView == null) {
+                    CreateChatLog();
+                }
+            }
+
+            // Check if the inputField already exists, if not, create it
+            if (inputField == null) {
+                foreach (var input in Resources.FindObjectsOfTypeAll<InputField>()) {
+                    if (input.transform.parent.name == "ChatCanvas (RCGLifeCycle)") {
+                        inputField = input.gameObject;
+                        ToastManager.Toast(input.name); // Log the found InputField
+                    }
+                }
+                // Create Input Field if it doesn't exist
+                if (inputField == null) {
+                    CreateInputField();
+                }
+            }
+            clearAllEnemiesCoroutine = StartCoroutine(ClearAllEnemies());
+
+        }
+
+        private void OnConnectionStatusChecked(bool success) {
+            if (!success) {
+                ToastManager.Toast("Connection failed.");
+                return;
+            }
+
+            if (Player.i == null) return;
+
+            //ConfigurePlayerEffectReceiver();
+            LoadMinionPrefab();
+        }
+
+        private void ConfigurePlayerEffectReceiver() {
+            var effectReceiver = Player.i.transform
+                .Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")
+                ?.GetComponent<EffectReceiver>();
+
+            if (effectReceiver != null) {
+                effectReceiver.effectType = EffectType.EnemyAttack |
+                                            EffectType.BreakableBreaker |
+                                            EffectType.ShieldBreak |
+                                            EffectType.PostureDecreaseEffect;
+            }
+        }
+
+        private void LoadMinionPrefab() {
+            var allObjects = Resources.FindObjectsOfTypeAll<MonsterBase>();
+            foreach (var obj in allObjects) {
+                if (obj.name == "StealthGameMonster_Minion_prefab") {
+                    minionPrefab = obj.gameObject;
+                    AutoAttributeManager.AutoReference(minionPrefab);
+                    AutoAttributeManager.AutoReferenceAllChildren(minionPrefab);
+
+                    var levelAwakeList = minionPrefab.GetComponentsInChildren<ILevelAwake>(true);
+                    for (var i = levelAwakeList.Length - 1; i >= 0; i--) {
+                        var context = levelAwakeList[i];
+                        try { context.EnterLevelAwake(); } catch (Exception ex) { Log.Error(ex.StackTrace); }
+                    }
                     return;
                 }
+            }
 
-                client = new TcpClient("127.0.0.1", serverPortConfig.Value); // Replace with the actual server IP
-                stream = client.GetStream();
-                Logger.LogInfo("Client connected to the server.");
-
-                clientThread = new Thread(() => HandleServerCommunication(client));
-                clientThread.Start();
-            } catch (Exception ex) {
-                Logger.LogError($"Error connecting to server: {ex.Message}");
+            if (minionPrefab == null) {
+                StartCoroutine(PreloadMinionPrefab());
             }
         }
 
-        private void HandleServerCommunication(TcpClient client) {
-            try {
-                byte[] buffer = new byte[1024];
+        // Coroutine to check connection status
+        private IEnumerator CheckConnectionStatus(Action<bool> callback) {
+            float timeout = 2f; // Time to wait for a successful connection
+            float elapsedTime = 0f;
 
-                while (client.Connected) {
-                    if (stream!.DataAvailable) {
-                        int bytesRead = stream.Read(buffer, 0, buffer.Length);
-                        if (bytesRead > 0) {
-                            string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                            Logger.LogInfo($"Received message from server: {message}");
+            while (!(_client.FirstPeer?.ConnectionState == ConnectionState.Connected) && elapsedTime < timeout) {
+                elapsedTime += Time.deltaTime;
+                yield return null;
+            }
+
+            bool isConnected = _client.FirstPeer?.ConnectionState == ConnectionState.Connected;
+            callback(isConnected);
+
+            if (!isConnected) {
+                _client.Stop(); // Clean up client on failure
+            }
+        }
+
+
+
+        private IEnumerator PreloadMinionPrefab() {
+            // Execute the scene loading/unloading coroutine
+            yield return StartCoroutine(LoadUnloadScene());
+
+            // Once the scene is unloaded, search for the object
+            var allObjects = Resources.FindObjectsOfTypeAll<MonsterBase>();
+
+            foreach (var obj in allObjects) {
+                if (obj.name == "StealthGameMonster_Minion_prefab") {
+                    minionPrefab = obj.gameObject;
+                    AutoAttributeManager.AutoReference(minionPrefab);
+                    AutoAttributeManager.AutoReferenceAllChildren(minionPrefab);
+                    break;
+                }
+            }
+
+            // Log the result of the search
+            if (minionPrefab != null) {
+                Log.Info($"Object '{minionPrefab.name}' found.");
+            } else {
+                Log.Warning("Object 'StealthGameMonster_Minion_prefab' not found.");
+            }
+        }
+
+        private IEnumerator LoadUnloadScene() {
+            string sceneName = "A1_S2_ConnectionToElevator_Final";
+
+            // Load the scene additively
+            AsyncOperation asyncLoad = SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Additive);
+            while (!asyncLoad.isDone) {
+                yield return null; // Wait for the scene to load
+            }
+
+            Log.Info($"Scene {sceneName} loaded.");
+
+            // Access the loaded scene
+            Scene loadedScene = SceneManager.GetSceneByName(sceneName);
+            if (!loadedScene.IsValid()) {
+                Log.Error($"Scene {sceneName} is not valid after loading.");
+                yield break;
+            }
+
+            // Unload the scene
+            AsyncOperation asyncUnload = SceneManager.UnloadSceneAsync(sceneName);
+            while (!asyncUnload.isDone) {
+                yield return null; // Wait for the scene to unload
+            }
+
+            Log.Info($"Scene {sceneName} unloaded.");
+
+            // Wait for 3 seconds
+            Log.Info("Waiting for 3 seconds before reloading the active scene...");
+            yield return WaitForPrefabAndGameCoreState("StealthGameMonster_Minion_prefab");
+
+            // Reload the active scene
+            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+            Log.Info("Active scene reloaded.");
+        }
+
+
+
+        private IEnumerator WaitForPrefabAndGameCoreState(string prefabName, float timeoutSeconds = 2f) {
+
+            float elapsedTime = 0f;
+
+            // Continuously check for the prefab and game state within the timeout duration
+            while (minionPrefab == null && elapsedTime < timeoutSeconds) {
+                // Check all objects for the target prefab
+                foreach (var obj in Resources.FindObjectsOfTypeAll<MonsterBase>()) {
+                    if (obj.name == prefabName) {
+                        minionPrefab = obj.gameObject;
+                        break;
+                    }
+                }
+
+                // Log if the object hasn't been found yet (optional)
+                if (minionPrefab == null) {
+                    Log.Info($"Waiting for '{prefabName}' to be found...");
+                }
+
+                // Wait for the next frame and increment elapsed time
+                yield return null;
+                elapsedTime += Time.deltaTime;
+            }
+
+            if (minionPrefab == null) {
+                Log.Warning($"Timeout: Prefab '{prefabName}' not found within {timeoutSeconds} seconds.");
+                yield break;
+            }
+
+            Log.Info($"Prefab '{minionPrefab.name}' found within {elapsedTime:F2} seconds.");
+        }
+
+        private async void DisconnectFromServer() {
+            if (!_client.IsRunning) return;
+
+            // Send the "Leave" message reliably
+            _dataWriter.Reset();
+            _dataWriter.Put("Leave");
+            _dataWriter.Put(playerName.Value);
+            _client.FirstPeer.Send(_dataWriter, DeliveryMethod.ReliableOrdered);
+
+            // Wait for the message to be processed
+            const int MaxWaitTime = 500; // Maximum wait time in milliseconds
+            int elapsedTime = 0;
+            while (_client.FirstPeer.ConnectionState != ConnectionState.Disconnected && elapsedTime < MaxWaitTime) {
+                await Task.Delay(50); // Check every 50 ms
+                elapsedTime += 50;
+            }
+
+            // Disconnect the client
+            _client.DisconnectAll();
+            _client.Stop();
+            _localPlayerId = -1;
+            ClearPlayerObjects();
+            ClearEnemyObjects();
+            StopClearingEnemies();
+            ToastManager.Toast("Disconnected from server.");
+        }
+
+        private void ClearEnemyObjects() {
+            foreach (var enemy in enemyDict.Values) {
+                Destroy(enemy.EnemyObject);
+            }
+            enemyDict.Clear();
+        }
+
+        private void ClearPlayerObjects() {
+            foreach (var playerData in _playerObjects.Values) {
+                Destroy(playerData.PlayerObject);
+            }
+            _playerObjects.Clear();
+        }
+
+        
+
+        public void SendEnemy(string uniqueID, float health, Vector3 pos,bool isFacingRight) {
+            if (_client.IsRunning && _client.FirstPeer?.ConnectionState == ConnectionState.Connected) {
+                _dataWriter.Reset();
+                _dataWriter.Put("Enemy");
+                _dataWriter.Put(uniqueID);  // Send unique ID
+                _dataWriter.Put(_localPlayerId);  // Send unique ID
+                _dataWriter.Put(health);  // Send unique ID
+                _dataWriter.Put(enemyAnimationState);
+                _dataWriter.Put(pos.x);
+                _dataWriter.Put(pos.y);
+                _dataWriter.Put(pos.z);
+                _dataWriter.Put(isFacingRight);
+                _client.FirstPeer.Send(_dataWriter, DeliveryMethod.ReliableOrdered);
+            }
+        }
+
+
+        void HandleEnemyUpdate(NetDataReader reader) {
+            var enemyID = reader.GetString(); // Unique enemy ID
+            var playerId = reader.GetInt();   // Unique player ID
+            var health = reader.GetFloat();   // Health of the enemy
+            var state = reader.GetString();   // State of the enemy (optional)
+            var posx = reader.GetFloat();
+            var posy = reader.GetFloat();
+            var posz = reader.GetFloat();
+            var isFacingRight = reader.GetBool();
+            
+            // Loop through existing enemies in MonsterManager
+            foreach (var e in MonsterManager.Instance.monsterDict.Values) {
+                // Match the enemy by its unique ID
+                if (e.ActorID == enemyID) {
+                    GameObject g = e.gameObject;
+
+                    var newPos = new Vector3(posx, posy, posz);
+                    if (playerId == -1) return;
+                    // Check if this enemy already exists for the player
+                    if (!enemyDict.TryGetValue(playerId.ToString(), out var enemyData)) {
+                        // Instantiate the enemy if not already created
+                        if (health > 0) {
+                            enemyData = new EnemyData(Instantiate(g, newPos, Quaternion.identity), enemyID);
+                            enemyDict[playerId.ToString()] = enemyData;
+                            if (!enemyData.EnemyObject.activeSelf) {
+                                enemyData.EnemyObject.SetActive(true);
+                            }
+                            // Set transparency for the new enemy
+                            var sprites = enemyData.EnemyObject.GetComponentsInChildren<SpriteRenderer>();
+                            foreach (var sprite in sprites) {
+                                var currentColor = sprite.color;
+                                currentColor.a = 0.4f; // Set transparency
+                                sprite.color = currentColor;
+                            }
+
+                            var hints = enemyData.EnemyObject.GetComponentsInChildren<MultiSpriteEffect>();
+                            foreach (var hint in hints) {
+                                Destroy(hint.gameObject);
+                            }
+
+                            var weak = enemyData.EnemyObject.GetComponentsInChildren<WeaknessEffectManager>();
+                            foreach (var w in weak) {
+                                Destroy(w.gameObject);
+                            }
+
+                            Log.Info($"Created new enemy for Player {playerId}: Enemy ID: {enemyID}");
+                        }
+                    } else {
+
+                        if (health <= 0) {
+                            Log.Info($"Enemy {enemyData.guid} for Player {playerId} has died. Removing.");
+                            Destroy(enemyData.EnemyObject);
+                            enemyDict.Remove(playerId.ToString()); // Remove reference from dictionary
+                            continue; // Skip further processing for this enemy
+                        } else {
+                            if (!enemyData.EnemyObject.transform.Find("MonsterCore").gameObject.activeSelf) {
+                                enemyData.EnemyObject.transform.Find("MonsterCore").gameObject.SetActive(true);
+                            }
+                        }
+
+                        // Check if the enemy's unique ID has changed (indicating a replacement)
+                        if (enemyData.guid != enemyID) {
+                            Log.Info($"Replacing enemy for Player {playerId}: Old GUID: {enemyData.guid}, New GUID: {enemyID}");
+                            Destroy(enemyData.EnemyObject);
+                            enemyData.EnemyObject = Instantiate(g, newPos, Quaternion.identity);
+                            enemyData.guid = enemyID;
+
+                            var sprites = enemyData.EnemyObject.GetComponentsInChildren<SpriteRenderer>();
+                            foreach (var sprite in sprites) {
+                                var currentColor = sprite.color;
+                                currentColor.a = 0.4f; // Set transparency
+                                sprite.color = currentColor;
+                            }
+
+                            // Explicitly reassign for clarity
+                            enemyDict[playerId.ToString()] = enemyData;
+                        }
+
+                        // Update the position of the existing enemy
+                        enemyData.EnemyObject.transform.Find("MonsterCore/Animator(Proxy)/Animator").position = newPos;
+
+                        // Flip the enemy based on facing direction
+                        var scale = enemyData.EnemyObject.transform.localScale;
+                        scale.x = scale.x * (isFacingRight ? 1 : -1);
+                        enemyData.EnemyObject.transform.Find("MonsterCore/Animator(Proxy)/Animator").transform.localScale = scale;
+
+                        // Update animation state
+                        var animator = enemyData.EnemyObject.transform.Find("MonsterCore/Animator(Proxy)/Animator").GetComponent<Animator>();
+                        if (animator != null) {
+                            AnimatorStateInfo currentState = animator.GetCurrentAnimatorStateInfo(0);
+
+                            // Play the animation only if it's not already playing
+                            if (!currentState.IsName(state)) {
+                                Log.Info($"Playing animation '{state}' for Enemy {enemyID} of Player {playerId}");
+                                animator.Play(state, 0, 0f);
+                            }
                         }
                     }
-
-                    Thread.Sleep(50); // Prevent tight looping
                 }
-            } catch (Exception ex) {
-                Logger.LogError($"Error in communication with server: {ex.Message}");
-            } finally {
-                client.Close();
-                Logger.LogInfo("Client disconnected from the server.");
             }
         }
 
+        private void StopClearingEnemies() {
+            // Stop the coroutine if it's running
+            if (clearAllEnemiesCoroutine != null) {
+                StopCoroutine(clearAllEnemiesCoroutine);
+                clearAllEnemiesCoroutine = null;
+                Log.Info("Clearing enemies coroutine has been stopped.");
+            }
+        }
+
+
+        private IEnumerator ClearAllEnemies() {
+            while (true) {
+                yield return new WaitForSeconds(5f); // Wait for 5 seconds
+
+                // Loop through all enemies in the dictionary
+                foreach (var kvp in enemyDict) {
+                    var enemyData = kvp.Value;
+
+                    // Destroy the enemy game object
+                    if (enemyData.EnemyObject != null) {
+                        Destroy(enemyData.EnemyObject);
+                        Log.Info($"Destroyed enemy {enemyData.guid} due to periodic cleanup.");
+                    }
+                }
+
+                // Clear the dictionary
+                enemyDict.Clear();
+
+                Log.Info("Cleared all enemies.");
+            }
+        }
+
+
+        private void Update() {
+            if (_client.IsRunning && _client.FirstPeer?.ConnectionState == ConnectionState.Connected) {
+                _sendTimer += Time.deltaTime;
+                if (_sendTimer >= SendInterval) {
+                    SendPosition();
+                    var m = MonsterManager.Instance.FindClosestMonster();
+                    
+                    if (m != null) {
+                        var pos = m.transform.Find("MonsterCore/Animator(Proxy)/Animator").position;
+                        SendEnemy(m.ActorID,m.postureSystem.CurrentHealthValue, pos, m.Facing.ToString() == "Right");
+                    }
+                    _sendTimer = 0;
+                }
+            }
+
+            _client.PollEvents();
+
+            // Ensure inputField is not null before accessing
+            if (inputField != null) {
+                var input = inputField.GetComponent<InputField>(); // Fetch InputField once
+
+                // Handling the Enter key press
+                if (Input.GetKeyDown(KeyCode.Return)) {
+                    isTexting = true;
+                    Cursor.lockState = CursorLockMode.None;
+                    Cursor.visible = true;
+
+                    // Stop coroutine if it exists
+                    if (disableScrollCoroutine != null) {
+                        StopCoroutine(disableScrollCoroutine);
+                        disableScrollCoroutine = null;
+                    }
+
+                    // Ensure scrollView and inputField are not null
+                    if (scrollView != null && inputField != null && !input.isFocused) {
+                        scrollView.SetActive(true);  // Ensure the scroll view is shown
+                        inputField.SetActive(true);  // Ensure the input field is visible
+                        input.ActivateInputField();  // Focus the input field
+                    }
+
+                    // Start counting time when Enter is pressed
+                    if (!isTimerRunning) {
+                        timeStarted = Time.time;  // Record the time when Enter was pressed
+                        isTimerRunning = true;    // Start the timer
+                    }
+
+                    // Process message sending if input text is valid
+                    string message = input.text.Trim(); // Remove leading/trailing spaces
+
+                    if (!string.IsNullOrWhiteSpace(message)) {
+                        // If the message is valid, send it to the chat
+                        SendMessageToChat(message); // Call SendMessageToChat with the message
+                        input.text = string.Empty;  // Clear the input field after sending
+                        if (inputField != null) {
+                            inputField.SetActive(false); // Hide the input field after sending the message
+                        }
+                        if (disableScrollCoroutine != null) {
+                            StopCoroutine(disableScrollCoroutine);
+                        }
+                        disableScrollCoroutine = StartCoroutine(DisableScrollViewAfterDelay(3f)); // Optionally hide the scroll view after a delay
+                        isTexting = false;
+                    }
+
+                    // Keep the input field focused after processing
+                    if (inputField != null) {
+                        input.ActivateInputField();
+                    }
+                }
+
+                // Check for time elapsed after Enter key is pressed
+                if (isTimerRunning) {
+                    float timeElapsed = Time.time - timeStarted;  // Calculate elapsed time
+
+                    if (timeElapsed >= timeLimit && Input.GetKeyDown(KeyCode.Return)) {
+                        // If the specified time has passed, hide the input field
+                        if (inputField != null) {
+                            inputField.SetActive(false);  // Hide the input field after time limit
+                        }
+                        isTexting = false;
+
+                        // Stop coroutine if it exists
+                        if (disableScrollCoroutine != null) {
+                            StopCoroutine(disableScrollCoroutine);
+                            disableScrollCoroutine = null;
+                        }
+                        disableScrollCoroutine = StartCoroutine(DisableScrollViewAfterDelay(3f)); // Optionally hide the scroll view after a delay
+                        isTimerRunning = false;  // Stop the timer
+                    }
+                }
+
+                // Handling the Escape key
+                if (Input.GetKeyDown(KeyCode.Escape)) {
+                    if (inputField != null) {
+                        input.text = string.Empty; // Clear the input field
+                        inputField.SetActive(false); // Hide the input field
+                    }
+                    isTexting = false;
+
+                    // Stop coroutine if it exists
+                    if (disableScrollCoroutine != null) {
+                        StopCoroutine(disableScrollCoroutine);
+                        disableScrollCoroutine = null;
+                    }
+                    disableScrollCoroutine = StartCoroutine(DisableScrollViewAfterDelay(3f)); // Optionally start the coroutine for scroll view
+                }
+            }
+        }
+
+
+        // Coroutine to disable the scrollView after a delay
+        private IEnumerator DisableScrollViewAfterDelay(float delay) {
+            yield return new WaitForSeconds(delay);
+            scrollView.SetActive(false);
+            disableScrollCoroutine = null; // Reset the coroutine reference
+        }
+
+
+        private void CreateInputField() {
+            inputField = new GameObject("InputField");
+            inputField.transform.SetParent(chatCanvas.transform, false);  // Keep local position unaffected
+
+            var rect = inputField.AddComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(380, 30);  // Adjust width and height of the input field
+            rect.anchorMin = new Vector2(0, 0);  // Anchor it to the bottom-left corner
+            rect.anchorMax = new Vector2(0, 0);  // Anchor it to the bottom-left corner
+            rect.pivot = new Vector2(0, 0);  // Set pivot at the bottom-left corner
+            rect.anchoredPosition = new Vector2(20, 20);  // Position with a little padding from the bottom-left corner
+
+            var image = inputField.AddComponent<Image>();
+            image.color = Color.gray;
+
+            var input = inputField.AddComponent<InputField>();
+
+            // Add a child GameObject for input text
+            var textObj = new GameObject("Text");
+            textObj.transform.SetParent(inputField.transform, false);
+
+            var textRect = textObj.AddComponent<RectTransform>();
+            textRect.sizeDelta = new Vector2(360, 25);  // Adjust size of the text input
+            textRect.anchoredPosition = Vector2.zero;
+
+            var text = textObj.AddComponent<Text>();
+            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            text.fontSize = 12;
+            text.color = Color.black;  // Input text color
+            text.alignment = TextAnchor.MiddleLeft;
+
+            input.textComponent = text; // Assign the input text component
+
+            // Add a placeholder text
+            var placeholderObj = new GameObject("Placeholder");
+            placeholderObj.transform.SetParent(inputField.transform, false);
+
+            var placeholderRect = placeholderObj.AddComponent<RectTransform>();
+            placeholderRect.sizeDelta = new Vector2(360, 25);
+            placeholderRect.anchoredPosition = Vector2.zero;
+
+            var placeholder = placeholderObj.AddComponent<Text>();
+            placeholder.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            placeholder.fontSize = 12;
+            placeholder.color = new Color(0.7f, 0.7f, 0.7f, 1); // Gray placeholder color
+            placeholder.text = "Enter message...";
+            placeholder.alignment = TextAnchor.MiddleLeft;
+
+            input.placeholder = placeholder; // Assign the placeholder component
+
+            inputField.SetActive(false);
+        }
+
+
+        private void CreateChatLog() {
+            scrollView = new GameObject("ChatLogScrollView");
+            scrollView.transform.localPosition = Vector3.zero;
+            scrollView.transform.SetParent(chatCanvas.transform);
+
+            var scrollRect = scrollView.AddComponent<ScrollRect>();
+            scrollRect.vertical = true; // Enable vertical scrolling
+            scrollRect.horizontal = false; // Disable horizontal scrolling
+
+            var rect = scrollView.GetComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(380, 130); // Adjust size as needed
+            rect.anchorMin = new Vector2(0, 0);
+            rect.anchorMax = new Vector2(0, 0);
+            rect.anchoredPosition = new Vector2(20, 50);
+            rect.pivot = new Vector2(0, 0);
+
+            var mask = scrollView.AddComponent<Mask>();
+            var image = scrollView.AddComponent<Image>();
+            image.color = new Color(0, 0, 0, 0.3f);
+
+            var content = new GameObject("Content");
+            content.transform.SetParent(scrollView.transform);
+
+            var contentRect = content.AddComponent<RectTransform>();
+            contentRect.sizeDelta = new Vector2(360, 0);
+            contentRect.anchoredPosition = new Vector2(10, 0);
+
+            var verticalLayout = content.AddComponent<VerticalLayoutGroup>();
+            verticalLayout.childAlignment = TextAnchor.UpperLeft;
+            verticalLayout.childForceExpandWidth = true;
+            verticalLayout.childForceExpandHeight = false;  // Let messages grow vertically as needed
+            verticalLayout.spacing = 2; // Space between messages
+
+            var fitter = content.AddComponent<ContentSizeFitter>();
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            scrollRect.content = contentRect;
+
+            chatLog = content;
+
+            scrollView.SetActive(false);
+        }
+
+
+        private void ReceiveMessageToChat(string message) {
+            if (string.IsNullOrWhiteSpace(message)) return;
+
+            // Ensure the scroll view is active
+            scrollView.SetActive(true);
+
+            // Stop any active coroutine to disable the scroll view
+            if (disableScrollCoroutine != null) {
+                StopCoroutine(disableScrollCoroutine);
+                disableScrollCoroutine = null;
+            }
+
+            // Create a new GameObject for the chat message
+            var messageObj = new GameObject("ChatMessage");
+            messageObj.transform.SetParent(chatLog.transform, false);
+
+            // Add RectTransform for layout
+            var messageRect = messageObj.AddComponent<RectTransform>();
+            messageRect.sizeDelta = new Vector2(0, 0);  // Allow size to adjust dynamically
+
+            // Add Text component for displaying the message
+            var text = messageObj.AddComponent<Text>();
+            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            text.fontSize = 12;
+            text.color = Color.white;  // Set the text color
+            text.text = message;
+
+            // Enable word wrapping and multi-line behavior
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+            text.alignment = TextAnchor.UpperLeft;
+
+            // Add LayoutElement to allow dynamic height adjustment
+            var layoutElement = messageObj.AddComponent<LayoutElement>();
+            layoutElement.preferredWidth = 380;  // Maximum width before wrapping
+            layoutElement.flexibleHeight = 0;   // Let the height adjust dynamically
+            layoutElement.minHeight = 5f;       // Minimum height for single-line messages
+
+            // Force the layout to update after adding the message
+            Canvas.ForceUpdateCanvases();
+
+            // Scroll to the bottom of the chat log
+            var scrollRect = chatLog.GetComponentInParent<ScrollRect>();
+            if (scrollRect != null) {
+                Canvas.ForceUpdateCanvases();  // Ensure layout updates are applied
+                scrollRect.verticalNormalizedPosition = 0f;  // Scroll to the bottom
+            }
+
+            if(!isTexting)
+                disableScrollCoroutine = StartCoroutine(DisableScrollViewAfterDelay(3f));
+        }
+
+
+        private void SendMessageToChat(string message) {
+            if (string.IsNullOrWhiteSpace(message)) return;
+
+            // Create the GameObject for the chat message
+            var messageObj = new GameObject("ChatMessage");
+            messageObj.transform.SetParent(chatLog.transform, false);  // Attach to the chatLog container
+
+            // Add RectTransform
+            var messageRect = messageObj.AddComponent<RectTransform>();
+            messageRect.sizeDelta = new Vector2(0, 0);  // Allow dynamic adjustment based on content
+
+            // Add Text component
+            var text = messageObj.AddComponent<Text>();
+            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            text.fontSize = 12;
+            text.color = Color.white;  // Set text color
+            text.text = playerName.Value + ": " + message;
+
+            // Enable wrapping and multi-line behavior
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+            text.alignment = TextAnchor.UpperLeft;
+
+            // Add LayoutElement for dynamic layout adjustments
+            var layoutElement = messageObj.AddComponent<LayoutElement>();
+            layoutElement.preferredWidth = 380;  // Max width of the message before wrapping
+            layoutElement.flexibleHeight = 0;   // Let height adjust dynamically
+            layoutElement.minHeight = 5f;       // Minimum height for single-line messages
+
+            // Force the layout to update to account for the new message
+            Canvas.ForceUpdateCanvases();
+
+            // Scroll to the bottom to display the latest message
+            var scrollRect = chatLog.GetComponentInParent<ScrollRect>();
+            if (scrollRect != null) {
+                Canvas.ForceUpdateCanvases();  // Ensure layout updates are applied
+                scrollRect.verticalNormalizedPosition = 0f;  // Scroll to the bottom
+            }
+
+            // Networking logic
+            if (_client.FirstPeer == null) {
+                ToastManager.Toast("Not connected to server.");
+                return;
+            }
+
+            _dataWriter.Reset();
+            _dataWriter.Put("Chat");
+            _dataWriter.Put($"{playerName.Value}: {message}");
+            _client.FirstPeer.Send(_dataWriter, DeliveryMethod.Unreliable);
+        }
+
+
+
+
+
+        public void SendDecreaseHealth(int playerId, float value) {
+            if (_client.FirstPeer == null) {
+                ToastManager.Toast("Not connected to server.");
+                return;
+            }
+
+            _dataWriter.Reset();
+            _dataWriter.Put("DecreaseHealth");
+            _dataWriter.Put(playerId);
+            _dataWriter.Put(value);
+            _client.FirstPeer.Send(_dataWriter, DeliveryMethod.Unreliable);
+        }
+
+        public void SendRecoverableDamage(int playerId, float value) {
+            if (_client.FirstPeer == null) {
+                ToastManager.Toast("Not connected to server.");
+                return;
+            }
+
+            _dataWriter.Reset();
+            _dataWriter.Put("RecoverableDamage");
+            _dataWriter.Put(playerId);
+            _dataWriter.Put(value);
+            _client.FirstPeer.Send(_dataWriter, DeliveryMethod.Unreliable);
+        }
+
+        private void SendPosition() {
+            if (_localPlayerId == -1 || Player.i == null) return;
+
+            _dataWriter.Reset();
+            _dataWriter.Put("Position");
+            var position = Player.i.transform.position;
+            _dataWriter.Put(position.x);
+            _dataWriter.Put(position.y + 6.5f);
+            _dataWriter.Put(position.z);
+            _dataWriter.Put(localAnimationState);
+            _dataWriter.Put(Player.i.Facing.ToString() == "Right");
+
+            _client.FirstPeer.Send(_dataWriter, DeliveryMethod.Unreliable);
+        }
+
+        private void OnNetworkReceiveEvent(NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod deliveryMethod) {
+            HandleReceivedDataAsync(reader);
+            reader.Recycle();
+        }
+
+        private void OnPeerDisconnectedEvent(NetPeer peer, DisconnectInfo disconnectInfo) {
+            ClearPlayerObjects();
+        }
+
+        private async Task HandleReceivedDataAsync(NetDataReader reader) {
+            var messageType = reader.GetString();
+
+            switch (messageType) {
+                case "Position":
+                    HandlePositionMessage(reader);
+                    break;
+                case "localPlayerId":
+                    _localPlayerId = reader.GetInt();
+                    _dataWriter.Reset();
+                    _dataWriter.Put("Join");
+                    _dataWriter.Put(playerName.Value);
+                    _client.FirstPeer.Send(_dataWriter, DeliveryMethod.Unreliable);
+                    //ToastManager.Toast($"Assigned Player ID: {_localPlayerId}");
+
+                    _dataWriter.Reset();
+                    _dataWriter.Put("Scene");
+                    _dataWriter.Put(SceneManager.GetActiveScene().name);
+                    _client.FirstPeer.Send(_dataWriter, DeliveryMethod.ReliableOrdered);
+                    break;
+                case "DecreaseHealth":
+                    HandleDecreaseHealth(reader);
+                    break;
+                case "RecoverableDamage":
+                    HandleRecoverableDamage(reader);
+                    break;
+                case "DestroyDisconnectObject":
+                    HandleDisconnectObject(reader);
+                    break;
+                case "PvPEnabled":
+                    EnablePVP(reader);
+                    break;
+                case "GetName":
+                    var playerId = reader.GetInt();
+                    var name = reader.GetString();
+                    //ToastManager.Toast($"11111111111 {playerId} {name}");
+                    _playerObjects[playerId].name = name;
+                    //ToastManager.Toast(_playerObjects[playerId].PlayerObject);
+                    _playerObjects[playerId].PlayerObject.transform.Find("PlayerName").GetComponent<TextMeshPro>().text = name;
+                    break;
+                case "tp":
+                    var tpSceneName = reader.GetString();
+                    // Notify players about the teleport
+                    ToastManager.Toast($"Server Teleported All Players to {tpSceneName}");
+                    if (SceneManager.GetActiveScene().name == tpSceneName) break;
+                    // Go to the target scene
+                    GameCore.Instance?.GoToScene(tpSceneName);
+
+                    // Wait until the game is ready for playing
+                    await WaitPlaying();
+
+                    // Set the revive save point after the game is ready
+                    var teleportData = new TeleportPointData {
+                        sceneName = tpSceneName,
+                        TeleportPosition = Player.i.transform.position
+                    };
+                    GameCore.Instance?.SetReviveSavePoint(teleportData);
+                    break;
+                case "stop":
+                    ToastManager.Toast("Server Owner Stop Server");
+                    DisconnectFromServer();
+                    break;
+                case "Chat":
+                    //ToastManager.Toast("Chat");
+                    var msg = reader.GetString();
+
+                    ReceiveMessageToChat(msg);
+                    break;
+                case "Enemy":
+                    HandleEnemyUpdate(reader);
+                    //ToastManager.Toast($"{enemyName} {state} {posx} {posy} {posz}");
+                    break;
+                default:
+                    ToastManager.Toast(messageType);
+                    break;
+            }
+        }
+
+        private async Task WaitPlaying() {
+            while (GameCore.Instance.currentCoreState != GameCore.GameCoreState.Playing ||
+                   Player.i.playerInput.currentStateType == PlayerInputStateType.Cutscene) {
+                // Wait for 300 milliseconds before rechecking
+                await Task.Delay(300);
+            }
+        }
+
+
+        private void EnablePVP(NetDataReader reader) {
+            isPVP = reader.GetBool();
+            pvp.Value = isPVP ? "PVP Enabled" : "PVP Disabled";
+            ToastManager.Toast($"PvP {(isPVP ? "Enabled" : "Disabled")}");
+
+            var effectReceiver = Player.i.transform
+                .Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")
+                ?.GetComponent<EffectReceiver>();
+
+            if (effectReceiver != null) {
+                if (isPVP) {
+                    effectReceiver.effectType |= EffectType.EnemyAttack |
+                                                  EffectType.BreakableBreaker |
+                                                  EffectType.ShieldBreak |
+                                                  EffectType.PostureDecreaseEffect;
+
+                    foreach (var x in _playerObjects) {
+                        var e = x.Value.PlayerObject.transform.Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")?.GetComponent<EffectReceiver>();
+                        e.effectType |= EffectType.EnemyAttack |
+                                                  EffectType.BreakableBreaker |
+                                                  EffectType.ShieldBreak |
+                                                  EffectType.PostureDecreaseEffect;
+                    }
+                } else {
+                    effectReceiver.effectType &= ~(
+                        EffectType.BreakableBreaker |
+                        EffectType.ShieldBreak |
+                        EffectType.PostureDecreaseEffect);
+
+                    foreach (var x in _playerObjects) {
+                        var e = x.Value.PlayerObject.transform.Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")?.GetComponent<EffectReceiver>();
+                        e.effectType &= ~(
+                        EffectType.BreakableBreaker |
+                        EffectType.ShieldBreak |
+                        EffectType.PostureDecreaseEffect);
+                    }
+                }
+            }
+        }
+
+
+        private void HandlePositionMessage(NetDataReader reader) {
+            var playerId = reader.GetInt();
+            var position = new Vector3(reader.GetFloat(), reader.GetFloat(), reader.GetFloat());
+            var animationState = reader.GetString();
+            var isFacingRight = reader.GetBool();
+            var scene = reader.GetString();
+
+            // Ignore updates for the local player
+            if (_localPlayerId == playerId) return;
+
+            // Check if the player is in a different scene
+            if (scene != SceneManager.GetActiveScene().name) {
+                // If the player exists in the current scene, destroy their object and remove them
+                if (_playerObjects.TryGetValue(playerId, out var p)) {
+                    Destroy(p.PlayerObject);
+                    _playerObjects.Remove(playerId);
+                }
+                return;
+            }
+
+            // If the player object doesn't exist, create it
+            if (!_playerObjects.TryGetValue(playerId, out var playerData)) {
+                if (minionPrefab == null) return;
+                _dataWriter.Reset();
+                _dataWriter.Put("GetName");
+                _dataWriter.Put(playerId);
+                _client.FirstPeer.Send(_dataWriter, DeliveryMethod.ReliableOrdered);
+                ToastManager.Toast(playerId); // Notify that a new player object is being created
+                playerData = CreatePlayerObject(playerId, position);
+                _playerObjects[playerId] = playerData;
+            }
+
+            // Update the player's object properties
+            UpdatePlayerObject(playerData, position, animationState, isFacingRight);
+        }
+
+
+        private void HandleDecreaseHealth(NetDataReader reader) {
+            ToastManager.Toast("HandleDecreaseHealth");
+            var playerId = reader.GetInt();
+            var damage = reader.GetFloat();
+
+            if (playerId == _localPlayerId && Player.i != null) {
+                Player.i.health.ReceiveDOT_Damage(damage);
+                Player.i.ChangeState(PlayerStateType.Hurt, true);
+            }
+        }
+
+        private void HandleRecoverableDamage(NetDataReader reader) {
+            //ToastManager.Toast("RecoverableDamage");
+            var playerId = reader.GetInt();
+            var internalDamage = reader.GetFloat();
+
+            ToastManager.Toast($"HandleRecoverableDamage: {playerId} {_localPlayerId}");
+
+            if (playerId == _localPlayerId && Player.i != null) {
+                Player.i.health.ReceiveRecoverableDamage(internalDamage);
+                Player.i.ChangeState(PlayerStateType.LieDown, true);
+                Player.i.velocityModifierManager.attackKnockbackModifier.ApplyVelocity(400f * -Player.i.towardDir.x, 0f);
+            }
+        }
+
+        private void HandleDisconnectObject(NetDataReader reader) {
+            var playerId = reader.GetInt();
+            if (_playerObjects.TryGetValue(playerId, out var playerData)) {
+                Destroy(playerData.PlayerObject);
+                _playerObjects.Remove(playerId);
+            }
+
+            if (enemyDict.TryGetValue(playerId.ToString(), out var enemyData)) {
+                Destroy(enemyData.EnemyObject);
+                enemyDict.Remove(playerId.ToString());
+            }
+        }
+
+        string GetGameObjectPath(GameObject obj) {
+            string path = obj.name;
+            Transform current = obj.transform;
+
+            while (current.parent != null) {
+                current = current.parent;
+                path = current.name + "/" + path;
+            }
+
+            return path;
+        }
+
+        private void MakeDamage(GameObject playerObject, Player dp) {
+            // Locate the HitBoxManager
+            var hitBoxManager = playerObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager")?.transform;
+
+            if (hitBoxManager == null) {
+                // HitBoxManager not found
+                return;
+            }
+
+            // Get monster and binding parry references
+            var monster = minionPrefab.GetComponent<MonsterBase>();
+            var bindingParry = minionPrefab.transform
+                .Find("MonsterCore/Animator(Proxy)/Animator/LogicRoot/SwordSlashEffect/DamageArea")
+                ?.GetComponent<DamageDealer>()?.bindingParry;
+
+            if (monster == null || bindingParry == null) {
+                // Monster or binding parry not found
+                return;
+            }
+
+            // Iterate through children of HitBoxManager
+            foreach (Transform child in hitBoxManager) {
+                // Get all EffectDealer components within this child's hierarchy
+                var effectDealers = child.GetComponentsInChildren<EffectDealer>();
+                
+                foreach (var effectDealer in effectDealers) {
+                    // Get the path of the game object
+                    var hitBoxPath = GetGameObjectPath(effectDealer.gameObject);
+
+                    // Add DamageDealer to the game object
+                    var damageDealer = AddDamageDealer(playerObject, hitBoxPath, bindingParry, monster, effectDealer.FinalValue);
+                    if (damageDealer != null) {
+                        ConfigureEffectDealer(effectDealer, dp, damageDealer);
+                        ConfigureEffectReceiver(playerObject, dp);
+                    }
+                }
+            }
+        }
+
+        // Adds and configures a DamageDealer to a given path
+        private DamageDealer AddDamageDealer(GameObject playerObject, string hitBoxPath, ParriableAttackEffect bindingParry, MonsterBase monster, float damageAmount) {
+            var damageDealer = GameObject.Find(hitBoxPath).AddComponent<DamageDealer>();
+            if (damageDealer != null) {
+                damageDealer.type = DamageType.MonsterAttack;
+                damageDealer.bindingParry = bindingParry;
+                damageDealer.attacker = new Health(); // Add actual monster health if applicable
+                damageDealer.damageAmount = damageAmount;
+
+                Traverse.Create(damageDealer).Field("_parriableOwner").SetValue(monster);
+                Traverse.Create(damageDealer).Field("owner").SetValue(monster);
+            }
+
+            return damageDealer;
+        }
+
+        // Configures an EffectDealer with references to the DamageDealer
+        private void ConfigureEffectDealer(EffectDealer effectDealer, Player dp, DamageDealer damageDealer) {
+            Traverse.Create(effectDealer).Field("valueProvider").SetValue(damageDealer);
+            Traverse.Create(effectDealer).Field("fxTimingOverrider").SetValue(damageDealer);
+            effectDealer.owner = dp;
+            effectDealer.DealerEffectOwner = dp;
+
+            var customDealers = new List<DamageDealer> { damageDealer };
+            Traverse.Create(effectDealer).Field("customDealers").SetValue(customDealers.ToArray());
+        }
+
+        // Configures the EffectReceiver based on PvP status
+        private void ConfigureEffectReceiver(GameObject playerObject, Player dp) {
+            var effectReceiver = playerObject.transform
+                .Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")
+                ?.GetComponent<EffectReceiver>();
+
+            if (effectReceiver == null) return;
+
+            effectReceiver.Owner = dp;
+
+            if (isPVP) {
+                effectReceiver.effectType = EffectType.BreakableBreaker |
+                                            EffectType.ShieldBreak |
+                                            EffectType.PostureDecreaseEffect;
+            } else {
+                effectReceiver.effectType &= ~(EffectType.BreakableBreaker |
+                                               EffectType.ShieldBreak |
+                                               EffectType.PostureDecreaseEffect);
+            }
+        }
+
+        void DestroyChildObjects(GameObject parent, params string[] paths) {
+            foreach (var path in paths) {
+                var child = parent.transform.Find(path);
+                if (child != null) {
+                    Destroy(child.gameObject);
+                }
+            }
+        }
+
+        private PlayerData CreatePlayerObject(int playerId, Vector3 position) {
+            // Instantiate the player object
+            var playerObject = Instantiate(
+                Player.i.gameObject,
+                position,
+                Quaternion.identity
+            );
+
+            var name = new GameObject("PlayerName");
+
+            if (!displayPlayerName.Value)
+                name.SetActive(false);
+            var text = name.AddComponent<TextMeshPro>();
+            text.text = "Yuki";
+            text.fontSize = playerNameSize.Value;
+            // Optionally, enable auto sizing if needed
+            // text.autoSizeTextContainer = true;
+
+            text.alignment = TextAlignmentOptions.Center;
+
+            Vector3 playerPosition = playerObject.transform.position;
+
+            // Adjust the text's position by adding an offset to the y-axis
+            text.transform.position = new Vector3(playerPosition.x, playerPosition.y + 50f, playerPosition.z);
+
+            // Set the parent of the text to the player object
+            name.transform.SetParent(playerObject.transform);
+
+            // Ensure no rotation is applied to the text object (make it horizontal)
+            text.transform.rotation = Quaternion.identity;  // Reset any rotations
+
+            // Optional: If the text container is too constrained, make sure it's wide enough
+            // You can adjust the container's size or enable auto-sizing for the text
+            text.rectTransform.sizeDelta = new Vector2(2000f, 50f);  // Adjust width and height based on needs
+
+            Destroy(playerObject.GetComponent<Player>());
+            var dp = playerObject.AddComponent<Player>();
+
+
+            DestroyChildObjects(playerObject,
+        "RotateProxy/SpriteHolder/HitBoxManager/Foo",
+        "RotateProxy/SpriteHolder/HitBoxManager/FooInit",
+        "RotateProxy/SpriteHolder/HitBoxManager/FooExplode");
+
+            AutoAttributeManager.AutoReference(playerObject);
+            AutoAttributeManager.AutoReferenceAllChildren(playerObject);
+
+            playerObject.name = $"PlayerObject_{playerId}";
+
+            MakeDamage(playerObject, dp);
+
+            //var pp = playerObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.AddComponent<DamageDealer>();
+            //pp.type = DamageType.MonsterAttack;
+            //Traverse.Create(pp).Field("_parriableOwner").SetValue(GameObject.Find("A1_S2_GameLevel/Room/Prefab/Gameplay5/[自然巡邏框架]/[MonsterBehaviorProvider] LevelDesign_CullingAndResetGroup/[MonsterBehaviorProvider] LevelDesign_Init_Scenario (看守的人)/StealthGameMonster_Spearman (1)").GetComponent<StealthGameMonster>());
+            //Traverse.Create(pp).Field("owner").SetValue(GameObject.Find("A1_S2_GameLevel/Room/Prefab/Gameplay5/[自然巡邏框架]/[MonsterBehaviorProvider] LevelDesign_CullingAndResetGroup/[MonsterBehaviorProvider] LevelDesign_Init_Scenario (看守的人)/StealthGameMonster_Spearman (1)").GetComponent<StealthGameMonster>());
+            //pp.bindingParry = GameObject.Find("A1_S2_GameLevel/Room/Prefab/Gameplay5/[自然巡邏框架]/[MonsterBehaviorProvider] LevelDesign_CullingAndResetGroup/[MonsterBehaviorProvider] LevelDesign_Init_Scenario (看守的人)/StealthGameMonster_Spearman (1)/MonsterCore/Animator(Proxy)/Animator/LogicRoot/SwordSlashEffect/DamageArea").GetComponent<DamageDealer>().bindingParry;
+            //pp.attacker = GameObject.Find("A1_S2_GameLevel/Room/Prefab/Gameplay5/[自然巡邏框架]/[MonsterBehaviorProvider] LevelDesign_CullingAndResetGroup/[MonsterBehaviorProvider] LevelDesign_Init_Scenario (看守的人)/StealthGameMonster_Spearman (1)").GetComponent<StealthGameMonster>().health;
+            //pp.damageAmount = playerObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>().FinalValue;
+
+            //Traverse.Create(playerObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("valueProvider").SetValue(pp);
+            //Traverse.Create(playerObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("fxTimingOverrider").SetValue(pp);
+            //playerObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>().owner = dp;
+            //playerObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>().DealerEffectOwner = dp;
+
+            //playerObject.transform.Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver").gameObject.GetComponent<EffectReceiver>().Owner = dp;
+            //ToastManager.Toast(playerObject.transform.Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver"));
+
+            //var cc = Traverse.Create(playerObject.transform.Find("RotateProxy/SpriteHolder/HitBoxManager/AttackFront").gameObject.GetComponent<EffectDealer>()).Field("customDealers");
+            //var nn = new List<DamageDealer> { pp };
+            //cc.SetValue(nn.ToArray());
+
+            //var e = playerObject.transform
+            //            .Find("RotateProxy/SpriteHolder/Health(Don'tKey)/DamageReceiver")
+            //            .GetComponent<EffectReceiver>();
+
+            //ToastManager.Toast(e);
+            //if (e != null) {
+            //    e.effectType &= EffectType.EnemyAttack |
+            //                                EffectType.BreakableBreaker |
+            //                                EffectType.ShieldBreak |
+            //                                EffectType.PostureDecreaseEffect;
+            //}
+
+
+
+
+            //var effectReceiver = Player.i.transform
+            //    .Find("Health(Don'tKey)/DamageReceiver")
+            //    .GetComponent<EffectReceiver>();
+            //if (effectReceiver != null) {
+            //    effectReceiver.effectType = EffectType.EnemyAttack |
+            //                                EffectType.BreakableBreaker |
+            //                                EffectType.ShieldBreak |
+            //                                EffectType.PostureDecreaseEffect;
+            //}
+
+            // Update effect type on the EffectReceiver component
+            //var effectReceiver = playerObject.transform
+            //    .Find("Health(Don'tKey)/DamageReceiver")
+            //    .GetComponent<EffectReceiver>();
+            //if (effectReceiver != null) {
+            //    effectReceiver.effectType &= ~(EffectType.EnemyAttack |
+            //                                EffectType.BreakableBreaker |
+            //                                EffectType.ShieldBreak |
+            //                                EffectType.PostureDecreaseEffect);
+            //}
+
+            //// Disable all AbilityActivateChecker components
+            //foreach (var abilityChecker in playerObject.GetComponentsInChildren<AbilityActivateChecker>(true)) {
+            //    abilityChecker.enabled = false;
+            //}
+
+            // Set player object name
+            
+
+            // Return the player data
+            return new PlayerData(playerObject, position, playerId,name);
+        }
+
+
+        private void UpdatePlayerObject(PlayerData playerData, Vector3 position, string animationState, bool isFacingRight) {
+            // Update the position of the player object
+            var playerObject = playerData.PlayerObject.transform.Find("RotateProxy/SpriteHolder");
+            if (playerObject == null) {
+                Log.Error("Player object not found!");
+                return;
+            }
+
+            playerObject.transform.position = position;
+
+            // Update the position of nameObject
+            Vector3 nameObjectPosition = position;
+            nameObjectPosition.y += 50f;
+            playerData.nameObject.transform.position = nameObjectPosition;
+
+            // Update animation state
+            var animator = playerObject.GetComponent<Animator>();
+            if (animator == null) {
+                Log.Error("Animator not found on player object!");
+                return;
+            }
+
+            if (animationState != currentAnimationState) {
+                currentAnimationState = animationState;
+                animator.CrossFade(animationState, 0.1f);
+            } else if (animator.GetCurrentAnimatorStateInfo(0).IsName(animationState) &&
+                       animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1f) {
+                animator.PlayInFixedTime(animationState, 0, 0f);
+            }
+
+    }
+
+
         private void OnDestroy() {
-            serverListener?.Stop();
-            serverThread?.Abort();
-            client?.Close();
-            clientThread?.Abort();
-            harmony.UnpatchSelf();
+            _harmony.UnpatchSelf();
+            SceneManager.sceneLoaded -= OnSceneLoaded;
+            DisconnectFromServer();
         }
     }
 }
