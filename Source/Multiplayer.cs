@@ -1449,6 +1449,7 @@ namespace Multiplayer {
         }
 
         private void OnPeerDisconnectedEvent(NetPeer peer, DisconnectInfo disconnectInfo) {
+            DisconnectFromServer();
             ClearPlayerObjects();
         }
 
