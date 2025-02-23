@@ -37,6 +37,8 @@ namespace Multiplayer {
         private ConfigEntry<string> playerName;
         private ConfigEntry<bool> displayPlayerName;
         private ConfigEntry<int> playerNameSize;
+        private ConfigEntry<bool> displayEnemy;
+        private ConfigEntry<Color> enemyColor;
         public bool isPVP;
 
         private float timeStarted = 0f;  // Time when Enter key was pressed
@@ -92,6 +94,8 @@ namespace Multiplayer {
                 playerName = Config.Bind("Name", "Your Player Name", "", "");
                 displayPlayerName = Config.Bind("Name", "Is Display Player Name", true, "");
                 playerNameSize = Config.Bind("Name", "Player Name Size", 200, "");
+                displayEnemy = Config.Bind("Enemy", "Is Display Other Player Enemy", true, "");
+                enemyColor = Config.Bind("Enemy", "Other Player Enemy Color and transparency", new Color(1f,1f,1f,0.4f), "");
 
 #if DEBUG
                 KeybindManager.Add(this, ConnectToServer, () => new KeyboardShortcut(KeyCode.S,KeyCode.LeftControl));
@@ -974,8 +978,7 @@ namespace Multiplayer {
                             var sprites = enemyData.EnemyObject.GetComponentsInChildren<SpriteRenderer>();
                             foreach (var sprite in sprites) {
                                 var currentColor = sprite.color;
-                                currentColor.a = 0.4f; // Set transparency
-                                sprite.color = currentColor;
+                                sprite.color = enemyColor.Value;
                             }
 
                             var hints = enemyData.EnemyObject.GetComponentsInChildren<MultiSpriteEffect>();
@@ -1013,8 +1016,7 @@ namespace Multiplayer {
                             var sprites = enemyData.EnemyObject.GetComponentsInChildren<SpriteRenderer>();
                             foreach (var sprite in sprites) {
                                 var currentColor = sprite.color;
-                                currentColor.a = 0.4f; // Set transparency
-                                sprite.color = currentColor;
+                                sprite.color = enemyColor.Value;
                             }
 
                             // Explicitly reassign for clarity
@@ -1519,7 +1521,8 @@ namespace Multiplayer {
                     ReceiveMessageToChat(msg);
                     break;
                 case "Enemy":
-                    HandleEnemyUpdate(reader);
+                    if(displayEnemy.Value)
+                        HandleEnemyUpdate(reader);
                     //ToastManager.Toast($"{enemyName} {state} {posx} {posy} {posz}");
                     break;
                 default:
