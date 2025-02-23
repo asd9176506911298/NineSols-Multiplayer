@@ -22,3 +22,6 @@
 - tp sceneName example     tp VR_Challenge_Hub // tpeleprot All Player to Memory Of Boss Room
 - pvp 0 pvp 1 // pvp disable pvp enable
 - stop // shutdown server
+
+# Know issue
+- Some enemy color and transparency will not work
